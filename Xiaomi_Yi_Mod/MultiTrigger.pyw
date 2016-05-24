@@ -63,6 +63,7 @@ class App:
     def read_camera_config(self):
         self.camconfig = []
         for ix_cam in self.CamAddresses.keys():
+            print("Reading config for camera {:d}".format(ix_cam))
             tosend = '{"msg_id":3,"token":%s}' % self.CamTokens[ix_cam]
             resp = self.comm(tosend)
             cc = {}
@@ -131,9 +132,9 @@ class App:
                 self.CamSockets[CamID] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 if bind_to_interface:
                     # on windows, we can just use the ip of the device as the interface
-                    if (os.name == 'nt'):
+                    if os.name == 'nt':
                         self.CamSockets[CamID].bind((interface, 0))
-                    elif (os.name == 'posix'):
+                    elif os.name == 'posix':
                         self.CamSockets[CamID].setsockopt(socket.SOL_SOCKET,
                                                           App.SO_BINDTODEVICE, interface)
                 print("Connecting to {:s}".format(camaddr))
@@ -160,12 +161,13 @@ class App:
                         except:
                             break
                     self.camconn.destroy()  # hide connection selection
+                    time.sleep(0.4)
                     self.read_camera_config()
                     self.build_main_window()
                     break
                 else:
-                    if waiter <= 15:
-                        time.sleep(0.1)
+                    if waiter <= 20:
+                        time.sleep(0.4)
                         waiter += 1
                     else:
                         raise Exception('Connection', 'failed')  # throw an exception
@@ -262,7 +264,7 @@ class App:
         self.build_menu_controls()
 
     def build_menu_controls(self, *args):
-        print ("hi")
+        print("Building menu controls...")
         try:
             self.content.destroy()
         except Exception:

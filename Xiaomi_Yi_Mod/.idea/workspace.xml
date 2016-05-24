@@ -2,10 +2,136 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5464bb06-07fc-4347-ba5d-edb3e8721f77" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Files/YDXJ0004.mp4" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Files/YDXJ0005.mp4" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/Files/YDXJ0009.mp4" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/APManager" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/BTServer" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/amba.html" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/amba_reconnection.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/ambernation.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/ap.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/ap_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/ap_start_backup_before_wl_clean.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/ap_start_old.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/app_ble" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/app_ble_strings.txt" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/app_hh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/app_manager" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bcm4330.hcd" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bcm4330_ap_restart.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bcm4330_firmware_without_supplicant.bin" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bcm4330_restart.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bluetooth_module_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bsa_hh_resume.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bsa_hh_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bsa_hh_suspend.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bsa_server" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt_preload.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt_smt_test.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt_speakergain.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/bt_stop.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/do_bcm4330_debug.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/hostapd.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/load.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/p2p.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/p2p_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/preload.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/restart_webserver.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/setup_bluetooth.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/sta_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/start_telnetd.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/t_gpio.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/tcp_script.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/tcp_tuner.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/unload.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/update_unzip.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/web.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/web_ctrl.html" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi.ap.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi.p2p.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi.sta.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_ap_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_init.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_off.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_on.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_sta_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_deep_sleep_unload.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_host_set_phyreg.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_mdev_action.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_module_factory_valid.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_softmac.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_start.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_start_new.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wifi_stop.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wowlan.775.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wowlan.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wpa_event.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wpa_supplicant.ap.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../Yi_scripts_copy/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_AL/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_BR/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CL/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_CR/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DL/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_DR/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_EL/wifi/wpa_supplicant.conf" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/autoexec.ash" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/.goutputstream-51D4DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/.goutputstream-H3J9DY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/.goutputstream-SN3GEY" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/sta.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/watchdog.sh" afterPath="" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/../wifi_sta_ER/wifi/wpa_supplicant.conf" afterPath="" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/CC.pyw" afterPath="$PROJECT_DIR$/CC.pyw" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/MultiTrigger.pyw" afterPath="$PROJECT_DIR$/MultiTrigger.pyw" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Multisettings.cfg" afterPath="$PROJECT_DIR$/Multisettings.cfg" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/settings.cfg" afterPath="$PROJECT_DIR$/settings.cfg" />
     </list>
     <ignored path="Xiaomi_Yi_Mod.iws" />
@@ -27,34 +153,24 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="CC.pyw" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/CC.pyw">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1037">
-              <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
-              <folding>
-                <element signature="e#80#258#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="MultiTrigger.pyw" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3870">
-              <caret line="218" column="40" selection-start-line="218" selection-start-column="40" selection-end-line="218" selection-end-column="66" />
+            <state relative-caret-position="216">
+              <caret line="147" column="18" selection-start-line="147" selection-start-column="12" selection-end-line="147" selection-end-column="18" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="settings.cfg" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <file leaf-file-name="CC.pyw" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/CC.pyw">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="0">
-              <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding />
+            <state relative-caret-position="342">
+              <caret line="362" column="16" selection-start-line="362" selection-start-column="16" selection-end-line="362" selection-end-column="16" />
+              <folding>
+                <element signature="e#80#258#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -67,8 +183,8 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/CC.pyw" />
         <option value="$PROJECT_DIR$/MultiTrigger.pyw" />
+        <option value="$PROJECT_DIR$/CC.pyw" />
       </list>
     </option>
   </component>
@@ -103,7 +219,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -139,6 +254,7 @@
         </subPane>
       </pane>
       <pane id="Scope" />
+      <pane id="Scratches" />
     </panes>
   </component>
   <component name="RunManager">
@@ -295,13 +411,13 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="65" y="24" width="1855" height="1176" extended-state="6" />
-    <editor active="false" />
+    <editor active="true" />
     <layout>
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24959569" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24905661" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32910246" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
@@ -332,10 +448,18 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1800">
+          <caret line="103" column="34" selection-start-line="103" selection-start-column="34" selection-end-line="103" selection-end-column="34" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/CC.pyw">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13680">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#80#258#0" expanded="true" />
           </folding>
@@ -354,17 +478,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/CC.pyw">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13680">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
-          <folding>
-            <element signature="e#80#258#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -380,27 +493,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/CC.pyw">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13680">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
-          <folding>
-            <element signature="e#80#258#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/CC.pyw">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13680">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
-          <folding>
-            <element signature="e#80#258#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -416,14 +508,13 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/CC.pyw">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="13680">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#80#258#0" expanded="true" />
           </folding>
@@ -432,8 +523,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        <state relative-caret-position="3870">
+          <caret line="218" column="40" selection-start-line="218" selection-start-column="40" selection-end-line="218" selection-end-column="66" />
           <folding />
         </state>
       </provider>
@@ -442,7 +533,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -468,7 +558,116 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/CC.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13680">
+          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+          <folding>
+            <element signature="e#80#258#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/CC.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13680">
+          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+          <folding>
+            <element signature="e#80#258#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/CC.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13680">
+          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+          <folding>
+            <element signature="e#80#258#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/CC.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13680">
+          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+          <folding>
+            <element signature="e#80#258#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/CC.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13680">
+          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+          <folding>
+            <element signature="e#80#258#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
         </state>
       </provider>
     </entry>
@@ -486,7 +685,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -504,7 +702,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -522,14 +719,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/settings.cfg">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/.PyCharm2016.1/system/python_stubs/-1247972723/__builtin__.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="357">
@@ -537,18 +726,25 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/settings.cfg">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/MultiTrigger.pyw">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3870">
-          <caret line="218" column="40" selection-start-line="218" selection-start-column="40" selection-end-line="218" selection-end-column="66" />
+        <state relative-caret-position="216">
+          <caret line="147" column="18" selection-start-line="147" selection-start-column="12" selection-end-line="147" selection-end-column="18" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/CC.pyw">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1037">
-          <caret line="763" column="25" selection-start-line="763" selection-start-column="20" selection-end-line="763" selection-end-column="25" />
+        <state relative-caret-position="342">
+          <caret line="362" column="16" selection-start-line="362" selection-start-column="16" selection-end-line="362" selection-end-column="16" />
           <folding>
             <element signature="e#80#258#0" expanded="true" />
           </folding>

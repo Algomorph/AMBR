@@ -346,8 +346,8 @@ class App:
                     self.MainWindow()
                     break
                 else:
-                    if waiter <= 5:
-                        time.sleep(1)
+                    if waiter <= 20:
+                        time.sleep(0.4)
                         waiter += 1
                     else:
                         raise Exception('Connection', 'failed')  # throw an exception
@@ -1088,7 +1088,7 @@ class App:
                             self.FileProgress.config(text="%s downloaded" % (FileTP), bg="#ddffdd")
                             filek.write(chunk)
                             break
-                time.sleep(1)
+                time.sleep(0.1)
                 tmp += 1
                 if tmp >= 5:
                     raise Exception('File download', 'failed')  # throw an exception
