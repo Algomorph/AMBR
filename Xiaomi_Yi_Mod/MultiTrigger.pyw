@@ -269,6 +269,7 @@ class App:
             self.content.destroy()
         except Exception:
             pass
+
         self.master.geometry("475x250+300+75")
         self.content = Frame(self.mainwindow)
         self.controlbuttons = Frame(self.content)
@@ -315,9 +316,9 @@ class App:
         if self.zoom_level_value == "":
             tosend = '{"msg_id":15,"type":"current"}'
             resp = self.comm(tosend)
-            ThisZoomLevelValue = int(resp["param"])
+            current_zoom_level_value = int(resp["param"])
         else:
-            ThisZoomLevelValue = self.zoom_level_value
+            current_zoom_level_value = self.zoom_level_value
 
         if self.thread_zoom == "":
             self.thread_zoom = threading.Thread(target=self.action_change_zoom)
@@ -326,7 +327,7 @@ class App:
         self.ZoomLevelFrame = Frame(self.controlbuttons, width=50)
         self.ZoomLevel = Scale(self.ZoomLevelFrame, from_=0, to=100, orient=HORIZONTAL, width=10, length=150,
                                command=self.action_on_zoom_changed)
-        self.ZoomLevel.set(ThisZoomLevelValue)
+        self.ZoomLevel.set(current_zoom_level_value)
         self.ZoomLevel.pack(side=TOP)
         Label(self.ZoomLevelFrame, width=10, text="Zoom level", anchor=W).pack(side=TOP)
         self.ZoomLevelFrame.pack(side=TOP, fill=X, padx=5)
@@ -345,6 +346,7 @@ class App:
         self.FramePhotoButtonMod.pack(side=TOP, fill=X)
 
         self.content.pack(side=TOP, fill=X)
+        print("Done.")
 
     def on_photo_option_change(self, *args):
         myoption = self.Photo_options.keys()[self.Photo_options.values().index(self.Photo_thisvalue.get())]
