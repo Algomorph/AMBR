@@ -12,18 +12,15 @@ from operator import itemgetter
 
 
 class App:
-    # from socket.h
-    # define SO_BINDTODEVICE 25
-    SO_BINDTODEVICE = 25
-
     def __init__(self, master):
         self.connected = {}
-        self.camconfig = []
+        self.camconfig = {}
+        self.camconfig["capture_mode"] = "precise quality"
         self.ActualAction = ""
         self.defaultbg = master.cget('bg')
         self.camsettableconfig = {}
-        self.zoom_level_value = ""
-        self.zoom_level_old_value = ""
+        self.ZoomLevelValue = ""
+        self.ZoomLevelOldValue = ""
         self.thread_zoom = ""
         self.CamAddresses = {}
         self.CamSockets = {}
@@ -41,7 +38,7 @@ class App:
         self.master = master
         self.master.geometry("445x250+300+75")
         self.master.wm_title("Xiaomi Yi Multitrigger by Andy_S | ver %s" % AppVersion)
-        self.load_settings()
+        self.Settings()
 
         # create a menu
         self.menu = Menu(self.master)
@@ -56,39 +53,25 @@ class App:
         self.menu.add_cascade(label="Help", menu=self.helpmenu, underline=0)
         self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl: webbrowser.open_new(aurl),
                                   underline=0)
-        self.helpmenu.add_command(label="About...", command=self.show_about_info, underline=0)
-        self.check_for_updates()
-        self.build_conn_window()
+        self.helpmenu.add_command(label="About...", command=self.AboutProg, underline=0)
+        self.UpdateCheck()
+        self.ConnWindow()
 
-    def read_camera_config(self):
-        self.camconfig = []
-        message_id = 3
-        tosend = '{"msg_id":' + str(message_id) + '}'
-        print("Reading camera configurations...")
-        self.comm(tosend, True)
+    def noaction(self, *args):
+        return
 
-        for ix_cam in self.CamAddresses.keys():
-            resp = self.JsonData[ix_cam][message_id]
-            cc = {}
-            for each in resp["param"]:
-                cc.update(each)
-            self.camconfig.append(cc)
-
-    def load_settings(self, add="", rem=""):
+    def Settings(self, add="", rem=""):
         if add == "" and rem == "":  # nothing to add or remove = initial call
             try:  # open the settings file (if exists) and read the settings
                 filek = open("Multisettings.cfg", "r")
                 filet = filek.readlines()
                 filek.close()
-                cam_ix = 0
+                a = 1
                 for line in filet:
                     if not line.startswith("#"):
                         addr = line.split(" ")
-                        if len(addr) > 2:
-                            self.CamAddresses[cam_ix] = [addr[0], int(addr[1]), addr[2].strip()]
-                        else:
-                            self.CamAddresses[cam_ix] = [addr[0], int(addr[1])]
-                        cam_ix += 1
+                        self.CamAddresses[a] = [addr[0], int(addr[1])]
+                        a += 1
 
             except Exception as e:  # no settings file yet or file structure mismatch - lets create default one & set defaults
                 print e
@@ -99,14 +82,14 @@ class App:
                 tkMessageBox.showerror("Config file is broken",
                                        "Config file is broken.\n\n Please use format\n\nIP.address.of.cam port\n\nfor example\n192.168.0.10 7878")
 
-    def build_conn_window(self):
+    def ConnWindow(self):
         self.camconn = Frame(self.master)  # create connection window with buttons
-        b = Button(self.camconn, text="Connect Multitrigger", width=20, command=self.connect_cameras)
+        b = Button(self.camconn, text="Connect Multitrigger", width=20, command=self.CamConnect)
         b.focus_set()
         b.grid(row=1, column=1, padx=10, pady=2)
         self.camconn.pack(side=TOP, fill=X)
 
-    def check_for_updates(self):
+    def UpdateCheck(self):
         try:
             newversion = urllib2.urlopen(self.UpdateUrl, timeout=2).read()
         except Exception:
@@ -114,37 +97,23 @@ class App:
         if newversion > AppVersion:
             if tkMessageBox.askyesno("New version found",
                                      "NEW VERSION FOUND (%s)\nYours is %s\n\nOpen download page?" % (
-                                             newversion, AppVersion)):
+                                     newversion, AppVersion)):
                 webbrowser.open_new(self.GitUrl)
 
-    def show_about_info(self):
+    def AboutProg(self):
         tkMessageBox.showinfo("About",
                               "Multitrigger | ver. %s\nCreated by Andy_S, 2015\n\nandys@deltaflyer.cz" % AppVersion)
 
-    def connect_cameras(self):
+    def CamConnect(self):
         try:
             socket.setdefaulttimeout(5)
             for CamID in self.CamAddresses.keys():
-                bind_to_interface = False
-                if len(self.CamAddresses[CamID]) > 2:
-                    camaddr, camport, interface = self.CamAddresses[CamID]
-                    bind_to_interface = True
-                else:
-                    camaddr, camport = self.CamAddresses[CamID]
-                # create socket
-                self.CamSockets[CamID] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                if bind_to_interface:
-                    # on windows, we can just use the ip of the device as the interface
-                    if os.name == 'nt':
-                        self.CamSockets[CamID].bind((interface, 0))
-                    elif os.name == 'posix':
-                        self.CamSockets[CamID].setsockopt(socket.SOL_SOCKET,
-                                                          App.SO_BINDTODEVICE, interface)
-                print("Connecting to {:s}".format(camaddr))
+                camaddr, camport = self.CamAddresses[CamID]
+                self.CamSockets[CamID] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # create socket
                 self.CamSockets[CamID].setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 self.CamSockets[CamID].setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 self.CamSockets[CamID].connect((camaddr, camport))  # open socket
-            self.thread_read = threading.Thread(target=self.read_json)
+            self.thread_read = threading.Thread(target=self.JsonReader)
             self.thread_read.setDaemon(True)
             self.thread_read.setName('JsonReader')
             self.thread_read.start()
@@ -164,57 +133,54 @@ class App:
                         except:
                             break
                     self.camconn.destroy()  # hide connection selection
-                    time.sleep(0.4)
-                    self.read_camera_config()
-                    self.build_main_window()
+                    self.MainWindow()
                     break
                 else:
-                    if waiter <= 40:
-                        time.sleep(0.4)
+                    if waiter <= 15:
+                        time.sleep(1)
                         waiter += 1
                     else:
                         raise Exception('Connection', 'failed')  # throw an exception
 
+
         except Exception as e:
             self.AllConnected = False
             tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
-
             for CamID in self.CamSockets.keys():
                 try:
                     self.CamSockets[CamID].close()
                 except Exception:
                     pass
-            raise e
 
-    def json_loop(self, cam_id):
+    def JsonLoop(self, CamID):
         try:
-            ready = select.select([self.CamSockets[cam_id]], [], [])
+            ready = select.select([self.CamSockets[CamID]], [], [])
             if ready[0]:
-                byte = self.CamSockets[cam_id].recv(1)
+                byte = self.CamSockets[CamID].recv(1)
                 if byte == "{":
-                    self.Jsoncounter[cam_id] += 1
-                    self.Jsonflip[cam_id] = 1
+                    self.Jsoncounter[CamID] += 1
+                    self.Jsonflip[CamID] = 1
                 elif byte == "}":
-                    self.Jsoncounter[cam_id] -= 1
-                self.Jsondata[cam_id] += byte
+                    self.Jsoncounter[CamID] -= 1
+                self.Jsondata[CamID] += byte
 
-                if self.Jsonflip[cam_id] == 1 and self.Jsoncounter[cam_id] == 0:
+                if self.Jsonflip[CamID] == 1 and self.Jsoncounter[CamID] == 0:
                     try:
-                        data_dec = json.loads(self.Jsondata[cam_id])
-                        self.Jsondata[cam_id] = ""
-                        self.Jsonflip[cam_id] = 0
+                        data_dec = json.loads(self.Jsondata[CamID])
+                        self.Jsondata[CamID] = ""
+                        self.Jsonflip[CamID] = 0
                         if "msg_id" in data_dec.keys():
                             if data_dec["msg_id"] == 257:
-                                self.CamTokens[cam_id] = data_dec["param"]
-                            self.JsonData[cam_id][data_dec["msg_id"]] = data_dec
+                                self.CamTokens[CamID] = data_dec["param"]
+                            self.JsonData[CamID][data_dec["msg_id"]] = data_dec
                         else:
-                            raise Exception('Unknown data from camera ID ', cam_id)
+                            raise Exception('Unknown data from camera ID ', CamID)
                     except Exception as e:
-                        print(data_dec)
+                        print data
         except Exception:
-            self.connected[cam_id] = False
+            self.connected[CamID] = False
 
-    def read_json(self):
+    def JsonReader(self):
         for CamID in self.CamSockets.keys():
             self.Jsondata[CamID] = ""
             self.JsonData[CamID] = {}
@@ -223,7 +189,7 @@ class App:
             self.initcounter[CamID] = 0
             self.CamSockets[CamID].send('{"msg_id":257,"token":0}')  # auth to the camera
             while self.initcounter[CamID] < 300:
-                self.json_loop(CamID)
+                self.JsonLoop(CamID)
                 self.initcounter[CamID] += 1
                 if len(self.JsonData[CamID]) > 0:
                     self.connected[CamID] = True
@@ -233,125 +199,87 @@ class App:
             for CamID in self.CamSockets.keys():
                 self.CamSockets[CamID].setblocking(0)
                 self.connected[CamID] = True
-                self.json_loop(CamID)
+                self.JsonLoop(CamID)
 
-    def comm(self, payload, verbose=False):
-        print("hi")
-        sys.sysout.flush()
-        json_payload = json.loads(payload)
-        message_id = json_payload["msg_id"]
+    def Comm(self, tosend):
+        Jtosend = json.loads(tosend)
+        msgid = Jtosend["msg_id"]
+        for CamID in self.CamSockets.keys():
+            Jtosend["token"] = self.CamTokens[CamID]
+            tosend = json.dumps(Jtosend)
+            self.JsonData[CamID][msgid] = ""
+            self.CamSockets[CamID].send(tosend)
 
-        # send payload to cameras
-        for cam_ix in self.CamSockets.keys():
-            json_payload["token"] = self.CamTokens[cam_ix]
-            payload = json.dumps(json_payload)
-            self.JsonData[cam_ix][message_id] = ""
-            if verbose:
-                "Sending payload to camera {:d}".format(cam_ix)
-            self.CamSockets[cam_ix].send(payload)
-
-        # read response from cameras
-        for cam_ix in self.CamSockets.keys():
-            if verbose:
-                "Waiting for response from camera {:d}".format(cam_ix)
-            start = time.time()
-            while self.JsonData[cam_ix][message_id] == "":
-                now = time.time()
-                if int(now) - int(start) % 5 == 0:
-                    print("{:d} seconds with no response from camera {:d} (message_id {:s})."
-                          .format(now - start, cam_ix, message_id))
-                continue
-
-            if self.JsonData[cam_ix][message_id][
-                "rval"] == -4:  # wrong token, acquire new one & resend - "workaround" for camera insisting on tokens
+        for CamID in self.CamSockets.keys():
+            while self.JsonData[CamID][msgid] == "": continue
+            if self.JsonData[CamID][msgid][
+                "rval"] == -4:  # wrong token, ackquire new one & resend - "workaround" for camera insisting on tokens
                 tkMessageBox.showerror("One camera didn't fire",
-                                       "Camera #%s didn't fire properly\n\nYou will have to check the camera" +
-                                       "\nand shoot again." % cam_ix)
-                self.CamTokens[cam_ix] = ""
-                self.CamSockets[cam_ix].send('{"msg_id":257,"token":0}')
-                while self.CamTokens[cam_ix] == "":
-                    continue
-                json_payload["token"] = self.CamTokens[cam_ix]
-                payload = json.dumps(json_payload)
-                self.JsonData[cam_ix][message_id] = ""
-                self.CamSockets[cam_ix].send(payload)
-                while self.JsonData[cam_ix][message_id] == "":
-                    continue
-        return self.JsonData[1][message_id]
+                                       "Camera #%s didn't fire properly\n\nYou will have to check the camera\nand shoot again." % CamID)
+                self.CamTokens[CamID] = ""
+                self.CamSockets[CamID].send('{"msg_id":257,"token":0}')
+                while self.CamTokens[CamID] == "": continue
+                Jtosend["token"] = self.CamTokens[CamID]
+                tosend = json.dumps(Jtosend)
+                self.JsonData[CamID][msgid] = ""
+                self.CamSockets[CamID].send(tosend)
+                while self.JsonData[CamID][msgid] == "": continue
+        return self.JsonData[1][msgid]
 
-    def build_main_window(self):
+    def MainWindow(self):
         self.mainwindow = Frame(self.master, width=550, height=400)
         self.mainwindow.pack(side=TOP, fill=X)
-        self.build_menu_controls()
+        self.MenuControl()
 
-    def build_menu_controls(self, *args):
-        print("Building menu controls...")
+    def MenuControl(self, *args):
         try:
             self.content.destroy()
         except Exception:
             pass
-
         self.master.geometry("475x250+300+75")
         self.content = Frame(self.mainwindow)
         self.controlbuttons = Frame(self.content)
-
-        # self.ReadConfig()
-
-        if self.camconfig[0]["capture_mode"] == "precise quality":
-            self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=13, command=self.action_take_photo,
+        if self.camconfig["capture_mode"] == "precise quality":
+            self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=13, command=self.ActionPhoto,
                                  bg="#ccccff")
-        elif self.camconfig[0]["capture_mode"] == "precise quality cont.":
-            if self.camconfig[0]["precise_cont_capturing"] == "off":
-                self.bphoto = Button(self.controlbuttons, text="Start\nTIMELAPSE", width=13,
-                                     command=self.action_take_photo,
+        elif self.camconfig["capture_mode"] == "precise quality cont.":
+            if self.camconfig["precise_cont_capturing"] == "off":
+                self.bphoto = Button(self.controlbuttons, text="Start\nTIMELAPSE", width=13, command=self.ActionPhoto,
                                      bg="#66ff66")
             else:
-                self.bphoto = Button(self.controlbuttons, text="Stop\nTIMELAPSE", width=13,
-                                     command=self.action_take_photo,
+                self.bphoto = Button(self.controlbuttons, text="Stop\nTIMELAPSE", width=13, command=self.ActionPhoto,
                                      bg="#ff6666")
-        elif self.camconfig[0]["capture_mode"] == "burst quality":
-            self.bphoto = Button(self.controlbuttons, text="Burst \nPHOTOS", width=13, command=self.action_take_photo,
+        elif self.camconfig["capture_mode"] == "burst quality":
+            self.bphoto = Button(self.controlbuttons, text="Burst \nPHOTOS", width=13, command=self.ActionPhoto,
                                  bg="#ffccff")
-        elif self.camconfig[0]["capture_mode"] == "precise self quality":
-            self.bphoto = Button(self.controlbuttons, text="Delayed\nPHOTO", width=13, command=self.action_take_photo,
+        elif self.camconfig["capture_mode"] == "precise self quality":
+            self.bphoto = Button(self.controlbuttons, text="Delayed\nPHOTO", width=13, command=self.ActionPhoto,
                                  bg="#ccffff")
-
         self.bphoto.pack(side=LEFT, padx=12, pady=5)
 
-        self.brecord = Button(self.controlbuttons, text="Start\nRecording", width=7,
-                              command=self.action_start_recording,
+        self.brecord = Button(self.controlbuttons, text="Start\nRecording", width=7, command=self.ActionRecordStart,
                               bg="#66ff66")
-
         self.brecord.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-
-        if "off" in self.camconfig[0]["preview_status"] or "record" in self.camconfig[0]["app_status"]:
-            self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.action_start_video,
-                                  bg="#ffff66", state=DISABLED)
-        else:
-            self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.action_start_video,
-                                  bg="#ffff66")
-        self.bstream.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-
-        if self.camconfig[0]["capture_mode"] == "precise quality cont.":
-            if self.camconfig[0]["precise_cont_capturing"] == "on":
+        if self.camconfig["capture_mode"] == "precise quality cont.":
+            if self.camconfig["precise_cont_capturing"] == "on":
                 self.brecord.config(state=DISABLED)
                 self.brecord.update_idletasks()
 
-        if self.zoom_level_value == "":
+        if self.ZoomLevelValue == "":
             tosend = '{"msg_id":15,"type":"current"}'
-            resp = self.comm(tosend)
-            current_zoom_level_value = int(resp["param"])
+            resp = self.Comm(tosend)
+            ThisZoomLevelValue = int(resp["param"])
         else:
-            current_zoom_level_value = self.zoom_level_value
+            ThisZoomLevelValue = self.ZoomLevelValue
 
         if self.thread_zoom == "":
-            self.thread_zoom = threading.Thread(target=self.action_change_zoom)
+            self.thread_zoom = threading.Thread(target=self.ActionZoomChangeThread)
             self.thread_zoom.start()
 
         self.ZoomLevelFrame = Frame(self.controlbuttons, width=50)
         self.ZoomLevel = Scale(self.ZoomLevelFrame, from_=0, to=100, orient=HORIZONTAL, width=10, length=150,
-                               command=self.action_on_zoom_changed)
-        self.ZoomLevel.set(current_zoom_level_value)
+                               command=self.ActionZoomChange)
+        self.ZoomLevel.set(ThisZoomLevelValue)
         self.ZoomLevel.pack(side=TOP)
         Label(self.ZoomLevelFrame, width=10, text="Zoom level", anchor=W).pack(side=TOP)
         self.ZoomLevelFrame.pack(side=TOP, fill=X, padx=5)
@@ -362,111 +290,56 @@ class App:
         self.Photo_options = {"precise quality": "Single", "precise quality cont.": "Timelapse",
                               "burst quality": "Burst", "precise self quality": "Delayed"}
         self.Photo_thisvalue = StringVar(self.FramePhotoButtonMod)
-        self.Photo_thisvalue.set(self.Photo_options[self.camconfig[0]["capture_mode"]])  # actual value
-        self.Photo_thisvalue.trace("w", self.on_photo_option_change)
+        self.Photo_thisvalue.set(self.Photo_options[self.camconfig["capture_mode"]])  # actual value
+        self.Photo_thisvalue.trace("w", self.MenuPhoto_changed)
         self.Photo_valuebox = OptionMenu(self.FramePhotoButtonMod, self.Photo_thisvalue, *self.Photo_options.values())
         self.Photo_valuebox.config(width=10)
         self.Photo_valuebox.pack(side=LEFT, padx=10)
         self.FramePhotoButtonMod.pack(side=TOP, fill=X)
 
         self.content.pack(side=TOP, fill=X)
-        print("Done.")
 
-    def on_photo_option_change(self, *args):
+    def MenuPhoto_changed(self, *args):
         myoption = self.Photo_options.keys()[self.Photo_options.values().index(self.Photo_thisvalue.get())]
         tosend = '{"msg_id":2, "type":"capture_mode", "param":"%s"}' % (myoption)
-        self.comm(tosend)
-        self.camconfig[0]["capture_mode"] = myoption
-        self.build_menu_controls()
+        self.Comm(tosend)
+        self.camconfig["capture_mode"] = myoption
+        self.MenuControl()
 
-    def action_start_video(self):
-        cam_key = self.CamAddresses.keys()[0]
-        camaddr = self.CamAddresses[cam_key][0]
-        start_all = False
-        tosend = '{"msg_id":259,"param":"none_force"}'
-        self.comm(tosend)
-        self.custom_vlc_path = "/usr/bin/vlc"
-        try:
-            if self.custom_vlc_path != ".":
-                if os.path.isfile(self.custom_vlc_path):
-                    if start_all:
-                        for addr in self.CamAddresses.values():
-                            camaddr = addr[0]
-                            torun = '"%s" rtsp://%s:554/live' % (self.custom_vlc_path, camaddr)
-                            subprocess.Popen(torun, shell=True)
-                    else:
-                        torun = '"%s" rtsp://%s:554/live' % (self.custom_vlc_path, camaddr)
-                        subprocess.Popen(torun, shell=True)
-                else:
-                    tkMessageBox.showinfo("Live View",
-                                          "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %
-                                          camaddr)
-            else:
-                mysys = platform.system()
-                if mysys == "Windows":
-                    if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
-                        torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' % camaddr
-                        subprocess.Popen(torun, shell=True)
-                    else:
-                        if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
-                            torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' % camaddr
-                            subprocess.Popen(torun, shell=True)
-                        else:
-                            tkMessageBox.showinfo("Live View",
-                                                  "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %
-                                                  camaddr)
-                elif mysys == "Darwin":
-                    if os.path.isfile("/Applications/VLC.app/Contents/MacOS/VLC"):
-                        torun = '"/Applications/VLC.app/Contents/MacOS/VLC" rtsp://%s:554/live' % camaddr
-                        subprocess.Popen(torun, shell=True)
-                    else:
-                        tkMessageBox.showinfo("Live View",
-                                              "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %
-                                              camaddr)
-                else:
-                    tkMessageBox.showinfo("Live View",
-                                          "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %
-                                          camaddr)
-        except Exception as e:
-            tkMessageBox.showinfo("Live View",
-                                  "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %
-                                  camaddr)
-            raise e
-
-    def action_change_zoom(self):
+    def ActionZoomChangeThread(self):
         while self.AllConnected:
-            if self.zoom_level_old_value != self.zoom_level_value:
-                tosend = '{"msg_id":14,"type":"fast","param":"%s"}' % (self.zoom_level_value)
-                self.comm(tosend)
-                self.zoom_level_old_value = self.zoom_level_value
+            if self.ZoomLevelOldValue != self.ZoomLevelValue:
+                tosend = '{"msg_id":14,"type":"fast","param":"%s"}' % (self.ZoomLevelValue)
+                self.Comm(tosend)
+                self.ZoomLevelOldValue = self.ZoomLevelValue
             time.sleep(1)
 
-    def action_on_zoom_changed(self, *args):
-        self.zoom_level_value = self.ZoomLevel.get()
+    def ActionZoomChange(self, *args):
+        self.ZoomLevelValue = self.ZoomLevel.get()
 
-    def action_take_photo(self):
+    def ActionPhoto(self):
         myid = 769
         tosend = '{"msg_id":769}'
-        if self.camconfig[0]["capture_mode"] == "precise quality cont.":
-            if self.camconfig[0]["precise_cont_capturing"] == "on":
+        if self.camconfig["capture_mode"] == "precise quality cont.":
+            if self.camconfig["precise_cont_capturing"] == "on":
                 tosend = '{"msg_id":770}'
                 myid = 770
-            self.comm(tosend)
+            self.Comm(tosend)
         else:
-            self.comm(tosend)
+            self.Comm(tosend)
 
-    def action_start_recording(self):
+    def ActionRecordStart(self):
         tosend = '{"msg_id":513}'
-        self.comm(tosend)
-        self.brecord.config(text="STOP\nrecording", command=self.action_stop_recording, bg="#ff6666")
+        self.Comm(tosend)
+        self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666")
         self.brecord.update_idletasks()
         self.bphoto.config(state=DISABLED)
         self.bphoto.update_idletasks()
 
-    def action_stop_recording(self):
+    def ActionRecordStop(self):
         tosend = '{"msg_id":514}'
-        self.comm(tosend)
-        self.brecord.config(text="START\nrecording", command=self.action_start_recording, bg="#66ff66")
+        self.Comm(tosend)
+        self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66")
         self.brecord.update_idletasks()
         self.bphoto.config(state="normal")
         self.bphoto.update_idletasks()
