@@ -66,8 +66,8 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                 cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
                 cv2.drawMarker(foreground, self.largest_cc_centroid, (0, 0, 255), cv2.MARKER_CROSS, 11)
                 bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
-                cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y2-20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255))
+                cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1-20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
 
             if SilhouetteExtractor.DRAW_COMPONENTS:
                 stats = self.cc_stats

@@ -1,6 +1,7 @@
 GS = Grooming Start
 VSS = Vertical Sniffing Start
 RLSS = Rear Leg Scratch Start
+
 VSS:  6:48:07
 VSE:  6:49:27
 
