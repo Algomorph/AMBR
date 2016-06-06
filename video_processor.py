@@ -42,8 +42,9 @@ class VideoProcessor(metaclass=ABCMeta):
         if os.path.exists("settings.yaml"):
             stream = open("settings.yaml", mode='r')
             self.settings = load(stream, Loader=Loader)
+
             stream.close()
-            self.datapath = self.settings.datapath
+            self.datapath = self.settings['datapath']
 
         self.cap = cv2.VideoCapture(os.path.join(self.datapath, args.in_video))
         last_frame = self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1

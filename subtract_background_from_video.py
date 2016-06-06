@@ -71,7 +71,8 @@ class VideoBackgroundSubtractor(VideoProcessor):
         if args.mask_output_video == "":
             args.mask_output_video = args.in_video[:-4] + "_bs_mask.mp4"
 
-        self.mask_writer = cv2.VideoWriter(args.mask_output_video, cv2.VideoWriter_fourcc('X', '2', '6', '4'),
+        self.mask_writer = cv2.VideoWriter(os.path.join(self.datapath, args.mask_output_video),
+                                           cv2.VideoWriter_fourcc('X', '2', '6', '4'),
                                            self.cap.get(cv2.CAP_PROP_FPS),
                                            (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                                             int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))),
@@ -85,6 +86,7 @@ class VideoBackgroundSubtractor(VideoProcessor):
                                                        self.min_area, self.persistence_period,
                                                        self.use_morphological_filtering, False)
         if self.mask_file is not None:
+            self.mask_file = os.path.join(self.datapath, self.mask_file)
             if not os.path.isfile(self.mask_file):
                 raise ValueError("Could not find preliminary mask file at {:s}.".format(self.mask_file))
             self.prelim_mask = cv2.imread(self.mask_file, cv2.IMREAD_COLOR)
@@ -131,6 +133,9 @@ class VideoBackgroundSubtractor(VideoProcessor):
         fc = 1
         for i_frame in range(start, end + 1):
             frame = self.cap.read()[1]
+            # apply preliminary mask if at all present
+            if self.prelim_mask is not None:
+                frame = self.prelim_mask & frame
             # builds up the background model
             self.subtractor.apply(frame)
             if not self.no_progress_bar:
@@ -140,18 +145,26 @@ class VideoBackgroundSubtractor(VideoProcessor):
 
         # re-open video
         self.cap.release()
-        self.cap = cv2.VideoCapture(self.in_video)
+        self.cap = cv2.VideoCapture(os.path.join(self.datapath, self.in_video))
 
-    def process_frame(self):
+    def extract_foreground_mask(self):
         if self.prelim_mask is not None:
             frame = self.prelim_mask & self.frame
         else:
             frame = self.frame
-        self.mask = self.subtractor.apply(frame)
+        mask = self.subtractor.apply(frame)
+        self.mask = mask
+
+    def extract_foreground(self):
         foreground = self.frame.copy()
         foreground[self.mask < Label.PERSISTENCE_LABEL.value] = (0, 0, 0)
+        self.foreground = foreground
+
+    def process_frame(self):
+        self.extract_foreground_mask()
+        self.extract_foreground()
         self.mask_writer.write(self.mask)
-        self.foreground_writer.write(foreground)
+        self.foreground_writer.write(self.foreground)
 
 
 def main():

@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 
-from subtract_background_from_video import VideoBackgroundSubtractor, Label
+from subtract_background_from_video import Label
+from extract_silhouettes import SilhouetteExtractor
 import cv2
-import sys
 import numpy as np
-import cve
 import os.path
 import os
 import re
@@ -34,20 +33,20 @@ def generate_dist_kernel(size):
     return k
 
 
-class VideoBgsTester(VideoBackgroundSubtractor):
+class SilhouetteTester(SilhouetteExtractor):
     @staticmethod
     def make_parser(help_string):
-        parser = VideoBackgroundSubtractor.make_parser(help_string)
+        parser = SilhouetteExtractor.make_parser(help_string)
         parser.add_argument("ground_truth_folder")
         parser.add_argument("-of", "--output_file", default="test_bg_out.yaml")
         return parser
 
     def __init__(self, args):
         super().__init__(args, "foreground")
+        self.ground_truth_folder = os.path.join(self.datapath, self.ground_truth_folder)
         if not os.path.exists(self.ground_truth_folder):
             raise "Folder with ground truth images ({:s}) not found.".format(self.ground_truth_folder)
         # get test frame filenames
-
         files = os.listdir(self.ground_truth_folder)
         files.sort()
         # get file sizes
@@ -125,17 +124,17 @@ class VideoBgsTester(VideoBackgroundSubtractor):
                "average_weighted_false_negatives": float(ave_wfn),
                "tested_frame_count": self.tested_frame_coutner,
                "args": self.args_dict}
-        out_file = open(self.output_file, "w", encoding="utf_8")
+        out_file = open(os.path.join(self.datapath, self.output_file), "w", encoding="utf_8")
         dump(out, out_file, Dumper=Dumper)
         out_file.close()
         return 0
 
 
 def main():
-    parser = VideoBgsTester.make_parser("Subtract background from video and evaluate against the " +
+    parser = SilhouetteTester.make_parser("Subtract background from video and evaluate against the " +
                                         "provided still silhouettes.")
     args = parser.parse_args()
-    app = VideoBgsTester(args)
+    app = SilhouetteTester(args)
     app.initialize()
     retval = app.run()
     if retval != 0:
