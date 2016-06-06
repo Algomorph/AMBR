@@ -68,10 +68,6 @@ class VideoProcessor(metaclass=ABCMeta):
                                        int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))),
                                       True)
         self.writer.set(cv2.VIDEOWRITER_PROP_NSTRIPES, cpu_count())
-
-        if args.start_from > 0:
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, args.start_from)
-
         self.__dict__.update(vars(args))
         self.frame = None
         self.cur_frame_number = None
@@ -86,6 +82,10 @@ class VideoProcessor(metaclass=ABCMeta):
         start_time = time.time()
         total_frame_span = self.end_with - self.start_from
         frame_counter = 0
+
+        if self.start_from > 0:
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.start_from)
+
         if self.frame_count == -1:
             cur_frame_number = self.start_from
             while cur_frame_number < self.end_with:
