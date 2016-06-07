@@ -6,8 +6,11 @@
 AppVersion = "0.6.10"
 
 import base64, functools, hashlib, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, \
-    tkFileDialog, tkMessageBox, urllib2, webbrowser, zlib
-from Tkinter import *
+    webbrowser, zlib
+from tkinter import *
+from urllib.request import urlopen
+import tkinter.messagebox as tkMessageBox
+import tkinter.filedialog as tkFileDialog
 from operator import itemgetter
 
 
@@ -248,7 +251,7 @@ class App:
 
     def UpdateCheck(self):
         try:
-            newversion = urllib2.urlopen(self.UpdateUrl, timeout=2).read()
+            newversion = urlopen(self.UpdateUrl, timeout=2).read()
         except Exception:
             newversion = "0"
         if newversion > AppVersion:
@@ -415,7 +418,6 @@ class App:
                     except Exception as e:
                         if self.DebugMode:
                             self.DebugLog("UnkData", e)
-                        print data
         except Exception:
             self.connected = False
 
@@ -990,10 +992,10 @@ class App:
         self.FilesScrollbar.set(*args)
 
     def FileYScroll(self, *args):
-        apply(self.ListboxFileType.yview, args)
-        apply(self.ListboxFileName.yview, args)
-        apply(self.ListboxFileSize.yview, args)
-        apply(self.ListboxFileDate.yview, args)
+        self.ListboxFileType.yview(*args)
+        self.ListboxFileName.yview(*args)
+        self.ListboxFileSize.yview(*args)
+        self.ListboxFileDate.yview(*args)
 
     def FileDownReport(self, bytes_so_far, chunk_size, total_size, FileTP):
         percent = float(bytes_so_far) / total_size
@@ -1025,7 +1027,7 @@ class App:
             thisUrl = 'http://%s:%s/%s/%s' % (self.camaddr, self.camwebport, thisPwd, FileTP)
             if self.DebugMode:
                 self.DebugLog("FileDUrl", thisUrl)
-            response = urllib2.urlopen(thisUrl)
+            response = urlopen(thisUrl)
 
             total_size = response.info().getheader('Content-Length').strip()
             total_size = int(total_size)
