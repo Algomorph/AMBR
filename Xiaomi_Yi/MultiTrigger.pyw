@@ -6,8 +6,10 @@
 AppVersion = "0.1.1"
 
 import base64, functools, hashlib, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, \
-    tkFileDialog, tkMessageBox, urllib2, webbrowser, zlib
-from Tkinter import *
+    webbrowser, zlib
+from tkinter import *
+import tkinter.messagebox as tkMessageBox
+from urllib.request import urlopen
 from operator import itemgetter
 
 
@@ -91,7 +93,7 @@ class App:
                         cam_ix += 1
 
             except Exception as e:  # no settings file yet or file structure mismatch - lets create default one & set defaults
-                print e
+                print(e)
                 filek = open("Multisettings.cfg_example", "w")
                 ConfigFile = '192.168.0.10 7878\n#192.168.0.11 7878'
                 filek.write(ConfigFile)
@@ -108,10 +110,10 @@ class App:
 
     def check_for_updates(self):
         try:
-            newversion = urllib2.urlopen(self.UpdateUrl, timeout=2).read()
+            newversion = urlopen(self.UpdateUrl, timeout=2).read()
         except Exception:
             newversion = "0"
-        if newversion > AppVersion:
+        if str(newversion)[1:] > str(AppVersion):
             if tkMessageBox.askyesno("New version found",
                                      "NEW VERSION FOUND (%s)\nYours is %s\n\nOpen download page?" % (
                                              newversion, AppVersion)):
