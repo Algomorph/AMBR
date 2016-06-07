@@ -236,10 +236,9 @@ class App:
                 self.json_loop(CamID)
 
     def comm(self, payload, verbose=False):
-        print("hi")
-        sys.sysout.flush()
         json_payload = json.loads(payload)
         message_id = json_payload["msg_id"]
+        print(verbose)
 
         # send payload to cameras
         for cam_ix in self.CamSockets.keys():
