@@ -38,39 +38,64 @@ class VideoProcessor(metaclass=ABCMeta):
         return parser
 
     def __init__(self, args, out_postfix):
+        self.global_video_offset = 0
+        self.flip_video = False
         self.datapath = "./"
+        self.__dict__.update(vars(args))
+
         if os.path.exists("settings.yaml"):
             stream = open("settings.yaml", mode='r')
             self.settings = load(stream, Loader=Loader)
-
             stream.close()
             self.datapath = self.settings['datapath']
+            if 'raw_options' in self.settings:
+                raw_options = self.settings['raw_options']
+                if self.in_video in raw_options:
+                    self.global_video_offset = raw_options[args.in_video]['global_offset']
+                    self.flip_video = raw_options[args.in_video]['flip']
 
-        self.cap = cv2.VideoCapture(os.path.join(self.datapath, args.in_video))
+        self.cap = None
+        self.reload_video()
+
         last_frame = self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1
 
-        if args.end_with == -1:
-            args.end_with = last_frame
+        if self.end_with == -1:
+            self.end_with = last_frame
         else:
-            if args.end_with > last_frame:
+            if self.end_with > last_frame:
                 print(("Warning: specified end frame ({:d})is beyond the last video frame" +
                        " ({:d}). Stopping after last frame.")
-                      .format(args.end_with, last_frame))
-                args.end_with = last_frame
+                      .format(self.end_with, last_frame))
+                self.end_with = last_frame
 
-        if args.out_video == "":
-            args.out_video = args.in_video[:-4] + "_" + out_postfix + ".mp4"
+        if self.out_video == "":
+            self.out_video = args.in_video[:-4] + "_" + out_postfix + ".mp4"
 
-        self.writer = cv2.VideoWriter(os.path.join(self.datapath, args.out_video),
+        self.writer = cv2.VideoWriter(os.path.join(self.datapath, self.out_video),
                                       cv2.VideoWriter_fourcc('X', '2', '6', '4'),
                                       self.cap.get(cv2.CAP_PROP_FPS),
                                       (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                                        int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))),
                                       True)
         self.writer.set(cv2.VIDEOWRITER_PROP_NSTRIPES, cpu_count())
-        self.__dict__.update(vars(args))
+
         self.frame = None
         self.cur_frame_number = None
+
+    def go_to_frame(self, i_frame):
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, float(self.global_video_offset + i_frame))
+
+    def get_last_frame(self):
+        if self.cap is None:
+            return -1
+        else:
+            return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - self.global_video_offset) - 1
+
+    def reload_video(self):
+        if self.cap is not None:
+            self.cap.release()
+        self.cap = cv2.VideoCapture(os.path.join(self.datapath, self.in_video))
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.global_video_offset)
 
     def __del__(self):
         self.cap.release()
@@ -84,7 +109,7 @@ class VideoProcessor(metaclass=ABCMeta):
         frame_counter = 0
 
         if self.start_from > 0:
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.start_from)
+            self.go_to_frame(self.start_from)
 
         if self.frame_count == -1:
             cur_frame_number = self.start_from
@@ -100,7 +125,7 @@ class VideoProcessor(metaclass=ABCMeta):
         else:
             frame_interval = total_frame_span // self.frame_count
             for i_frame in range(self.start_from, self.end_with, frame_interval):
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+                self.go_to_frame(i_frame)
                 self.frame = self.cap.read()[1]
                 self.cur_frame_number = i_frame
                 self.process_frame()

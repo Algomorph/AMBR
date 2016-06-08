@@ -38,17 +38,18 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
             largest_comp_px_count = stats[ix_of_largest_component, 4]
             self.largest_cc_stats = stats[ix_of_largest_component]
             bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
-            self.result_data.append((self.cur_frame_number, largest_comp_px_count, bbox_w_h_ratio))
-
+            centroid_slice = centroids[ix_of_largest_component]
+            self.result_data.append(
+                (self.cur_frame_number, largest_comp_px_count, bbox_w_h_ratio, centroid_slice[0], centroid_slice[1]))
             if largest_comp_px_count > CcThreshold.HIDDEN.value:
                 self.has_contour = True
                 bin_mask[labels != ix_of_largest_component] = 0
                 self.bin_mask = bin_mask
                 self.mask[bin_mask == 0] = 0
                 self.cc_stats = stats
-
-                centroid_slice = centroids[ix_of_largest_component]
                 self.largest_cc_centroid = (int(round(centroid_slice[0])), int(round(centroid_slice[1])))
+        else:
+            self.result_data.append((self.cur_frame_number, 0, -1.0, -1., -1.))
 
     def extract_foreground(self):
         super().extract_foreground()
@@ -66,8 +67,8 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                 cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
                 cv2.drawMarker(foreground, self.largest_cc_centroid, (0, 0, 255), cv2.MARKER_CROSS, 11)
                 bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
-                cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1-20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255))
+                cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1 - 18),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255))
 
             if SilhouetteExtractor.DRAW_COMPONENTS:
                 stats = self.cc_stats
@@ -80,7 +81,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
 
     def save_results(self, verbose=False):
         largest_component_sizes = np.array(self.result_data)
-        np.savez_compressed(os.path.join(self.datapath, self.output_datafile), lcomps=largest_component_sizes)
+        np.savez_compressed(os.path.join(self.datapath, self.output_datafile), frame_data=largest_component_sizes)
         return 0
 
 

@@ -103,7 +103,7 @@ class VideoBackgroundSubtractor(VideoProcessor):
         if start < 0:
             return
         end = self.sampling_interval_end_frame
-        last_frame = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
+        last_frame = self.get_last_frame()
 
         if end <= start:
             raise ValueError("Sampling interval end frame (currently set to {:d}) should be greater than the " +
@@ -111,7 +111,8 @@ class VideoBackgroundSubtractor(VideoProcessor):
 
         if start > last_frame or end > last_frame:
             raise ValueError("The sampling interval start & end frame (currently set to {:d} and {:d}, " +
-                             "respectively) should be within [0,{:d}] as dictated by length of video {:s}."
+                             "respectively) should be within [0,{:d}] as dictated by length of video {:s} "+
+                             "(and global offset, if present)."
                              .format(start, end, last_frame, self.in_video))
 
         max_sampling_duration_frames = int(self.sampling_interval * (self.num_samples-1) / 1000 * self.fps) + 1
@@ -127,7 +128,7 @@ class VideoBackgroundSubtractor(VideoProcessor):
         if verbose:
             print("Initializing from frame {:d} to frame {:d}...".format(start, end))
 
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, float(start))
+        self.go_to_frame(start)
         start_time = time.time()
         total_frames = end - start + 1
         fc = 1
@@ -143,9 +144,7 @@ class VideoBackgroundSubtractor(VideoProcessor):
             fc += 1
         sys.stdout.write("\n")  # terminate progress bar
 
-        # re-open video
-        self.cap.release()
-        self.cap = cv2.VideoCapture(os.path.join(self.datapath, self.in_video))
+        self.reload_video()
 
     def extract_foreground_mask(self):
         if self.prelim_mask is not None:

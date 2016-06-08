@@ -1,1 +1,5 @@
-datapath: /media/algomorph/Data/reco/cap/mouse_cap04/al
+datapath: /media/algomorph/Data/reco/cap/mouse_cap04
+raw_options:
+    al0_raw.mp4:
+        global_offset: 38
+        flip: true

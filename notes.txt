@@ -1,42 +1,32 @@
-GS = Grooming Start
-VSS = Vertical Sniffing Start
-RLSS = Rear Leg Scratch Start
+#GS = Grooming Start
+#VSS = Vertical Sniffing Start
+#RLSS = Rear Leg Scratch Start
 
-VSS:  6:48:07
-VSE:  6:49:27
-
-GS:   6:53:17
-GE:   6:53:35
-
-VSS:  6:53:35
-VSE:  6:59:07
-
-GS:   6:59:07
-GE:   7:00:00
-
-GS:   7:01:38
-GE:   7:01:54
-
-RLSS: 7:02:05
-RLSE: 7:02:13
-
-RLSS: 7:02:43
-RLSE: 7:02:56
-
-GS:   7:58:35
-GE:   7:58:47
-
-VSS:  7:59:47
-VSE:  8:03:05
-
-VSS:  8:05:46
-VSE:  8:07:12
-
-VSS:  8:57:19
-VSE:  8:59:27
-
-VSS:  9:09:03
-VSE:  9:11:42
-
-VSS:  9:36:37
-VSE:  9:37:56 (end of video)
+{
+(6,48,7):"VSS",
+(6,49,27):"VSE",
+(6,53,17):"GS",
+(6,53,34):"GE",
+(6,53,35):"VSS",
+(6,59,6):"VSE",
+(6,59,7):"GS",
+(7,0,0):"GE",
+(7,1,38):"GS",
+(7,1,54):"GE",
+(7,2,5):"RLSS",
+(7,2,13):"RLSE",
+(7,2,43):"RLSS",
+(7,2,56):"RLSE",
+(7,58,35):"GS",
+(7,58,46):"GE",
+(7,59,47):"VSS",
+(8,3,5):"VSE",
+(8,5,46):"VSS",
+(8,7,12):"VSE",
+(8,57,19):"VSS",
+(8,59,27):"VSE",
+(9,9,3):"VSS",
+(9,11,42):"VSE",
+(9,36,37):"VSS",
+(9,37,56):"VSE"
+} #(end of video)
