@@ -10,11 +10,13 @@ from enum import Enum
 class CcThreshold(Enum):
     HIDDEN = 1200
     BBOX_THRESH = 6500
+    TRACK_DIST_THRESH = 60
 
 
 class SilhouetteExtractor(VideoBackgroundSubtractor):
     DRAW_COMPONENTS = False
     DRAW_BBOX = True
+    DRAW_FRAME_N = True
 
     @staticmethod
     def make_parser(help_string):
@@ -25,6 +27,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
     def __init__(self, args):
         super().__init__(args, "silhouettes")
         self.result_data = []
+        self.prev_frame_success = False
 
     def extract_foreground_mask(self):
         super().extract_foreground_mask()
@@ -34,22 +37,45 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
         labels, stats, centroids = cv2.connectedComponentsWithStats(bin_mask, ltype=cv2.CV_16U)[1:4]
         self.has_contour = False
         if len(stats) > 1:
-            ix_of_largest_component = np.argmax(stats[1:, 4]) + 1
-            largest_comp_px_count = stats[ix_of_largest_component, 4]
-            self.largest_cc_stats = stats[ix_of_largest_component]
+            # initially, just grab the biggest connected component
+            ix_of_tracked_component = np.argmax(stats[1:, 4]) + 1
+            centroid_slice = centroids[ix_of_tracked_component]
+            cur_largest_centroid = (int(round(centroid_slice[0])), int(round(centroid_slice[1])))
+            tracking_ok = True
+            if self.prev_frame_success:
+                a = self.largest_cc_centroid
+                b = cur_largest_centroid
+                dist = np.linalg.norm((a[0] - b[0], a[1] - b[1]))
+                # check to make sure we're not too far from the previously-detected blob
+                if dist > 50:
+                    dists = np.linalg.norm(centroids - b, axis=1)
+                    ix_of_tracked_component = np.argmin(dists)
+                    if dists[ix_of_tracked_component] > CcThreshold.TRACK_DIST_THRESH:
+                        self.prev_frame_success = False
+                        tracking_ok = False
+                    centroid_slice = centroids[ix_of_tracked_component]
+                    cur_largest_centroid = (int(round(centroid_slice[0])), int(round(centroid_slice[1])))
+
+            tracked_px_count = stats[ix_of_tracked_component, 4]
+            self.largest_cc_stats = stats[ix_of_tracked_component]
             bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
-            centroid_slice = centroids[ix_of_largest_component]
+            proceed = tracked_px_count > CcThreshold.HIDDEN.value and tracking_ok
             self.result_data.append(
-                (self.cur_frame_number, largest_comp_px_count, bbox_w_h_ratio, centroid_slice[0], centroid_slice[1]))
-            if largest_comp_px_count > CcThreshold.HIDDEN.value:
+                (self.cur_frame_number, tracked_px_count, bbox_w_h_ratio, centroid_slice[0], centroid_slice[1],
+                 int(proceed)))
+            if proceed:
                 self.has_contour = True
-                bin_mask[labels != ix_of_largest_component] = 0
+                bin_mask[labels != ix_of_tracked_component] = 0
                 self.bin_mask = bin_mask
                 self.mask[bin_mask == 0] = 0
                 self.cc_stats = stats
-                self.largest_cc_centroid = (int(round(centroid_slice[0])), int(round(centroid_slice[1])))
+                self.largest_cc_centroid = cur_largest_centroid
+                self.prev_frame_success = True
+            else:
+                self.prev_frame_success = False
         else:
-            self.result_data.append((self.cur_frame_number, 0, -1.0, -1., -1.))
+            self.prev_frame_success = False
+            self.result_data.append((self.cur_frame_number, 0, -1.0, -1., -1., 0.0))
 
     def extract_foreground(self):
         super().extract_foreground()
@@ -78,6 +104,10 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                     y1 = stats[i_comp, cv2.CC_STAT_TOP]
                     y2 = y1 + stats[i_comp, cv2.CC_STAT_HEIGHT]
                     cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
+
+            if SilhouetteExtractor.DRAW_FRAME_N:
+                cv2.putText(foreground, str(self.cur_frame_number), (0, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                            (255, 255, 0))
 
     def save_results(self, verbose=False):
         largest_component_sizes = np.array(self.result_data)
