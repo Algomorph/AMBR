@@ -42,12 +42,14 @@ class VideoProcessor(metaclass=ABCMeta):
         self.flip_video = False
         self.datapath = "./"
         self.__dict__.update(vars(args))
+        self.writer = None
 
         if os.path.exists("settings.yaml"):
             stream = open("settings.yaml", mode='r')
             self.settings = load(stream, Loader=Loader)
             stream.close()
             self.datapath = self.settings['datapath']
+            print(self.datapath)
             if 'raw_options' in self.settings:
                 raw_options = self.settings['raw_options']
                 if self.in_video in raw_options:
@@ -57,13 +59,13 @@ class VideoProcessor(metaclass=ABCMeta):
         self.cap = None
         self.reload_video()
 
-        last_frame = self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1
+        last_frame = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1)
 
         if self.end_with == -1:
             self.end_with = last_frame
         else:
             if self.end_with > last_frame:
-                print(("Warning: specified end frame ({:d})is beyond the last video frame" +
+                print(("Warning: specified end frame ({:d}) is beyond the last video frame" +
                        " ({:d}). Stopping after last frame.")
                       .format(self.end_with, last_frame))
                 self.end_with = last_frame
@@ -95,11 +97,14 @@ class VideoProcessor(metaclass=ABCMeta):
         if self.cap is not None:
             self.cap.release()
         self.cap = cv2.VideoCapture(os.path.join(self.datapath, self.in_video))
+        if not self.cap.isOpened():
+            raise ValueError("Could not open video!")
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.global_video_offset)
 
     def __del__(self):
         self.cap.release()
-        self.writer.release()
+        if self.writer is not None:
+            self.writer.release()
 
     def run(self, verbose=True):
         if verbose:
