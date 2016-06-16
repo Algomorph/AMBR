@@ -59,12 +59,11 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
             tracked_px_count = stats[ix_of_tracked_component, 4]
             self.largest_cc_stats = stats[ix_of_tracked_component]
             bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
-            proceed = tracked_px_count > CcThreshold.HIDDEN.value and tracking_ok
+            self.has_contour = tracked_px_count > CcThreshold.HIDDEN.value and tracking_ok
             self.result_data.append(
                 (self.cur_frame_number, tracked_px_count, bbox_w_h_ratio, centroid_slice[0], centroid_slice[1],
-                 int(proceed)))
-            if proceed:
-                self.has_contour = True
+                 int(self.has_contour)))
+            if self.has_contour:
                 bin_mask[labels != ix_of_tracked_component] = 0
                 self.bin_mask = bin_mask
                 self.mask[bin_mask == 0] = 0
