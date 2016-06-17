@@ -10,7 +10,7 @@ from enum import Enum
 class CcThreshold(Enum):
     HIDDEN = 1200
     BBOX_THRESH = 6500
-    TRACK_DIST_THRESH = 60
+    TRACK_DIST_THRESH = 60.
 
 
 class SilhouetteExtractor(VideoBackgroundSubtractor):
@@ -50,7 +50,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                 if dist > 50:
                     dists = np.linalg.norm(centroids - b, axis=1)
                     ix_of_tracked_component = np.argmin(dists)
-                    if dists[ix_of_tracked_component] > CcThreshold.TRACK_DIST_THRESH:
+                    if dists[ix_of_tracked_component] > CcThreshold.TRACK_DIST_THRESH.value:
                         self.prev_frame_success = False
                         tracking_ok = False
                     centroid_slice = centroids[ix_of_tracked_component]
