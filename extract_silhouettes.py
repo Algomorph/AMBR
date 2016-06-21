@@ -17,6 +17,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
     DRAW_COMPONENTS = False
     DRAW_BBOX = True
     DRAW_FRAME_N = True
+    DRAW_VALUE = True
 
     @staticmethod
     def make_parser(help_string):
@@ -36,6 +37,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
         bin_mask[bin_mask > 0] = 1
         labels, stats, centroids = cv2.connectedComponentsWithStats(bin_mask, ltype=cv2.CV_16U)[1:4]
         self.has_contour = False
+        self.value = -1.0
         if len(stats) > 1:
             # initially, just grab the biggest connected component
             ix_of_tracked_component = np.argmax(stats[1:, 4]) + 1
@@ -46,9 +48,10 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                 a = self.largest_cc_centroid
                 b = cur_largest_centroid
                 dist = np.linalg.norm((a[0] - b[0], a[1] - b[1]))
+                self.value = dist
                 # check to make sure we're not too far from the previously-detected blob
                 if dist > 50:
-                    dists = np.linalg.norm(centroids - b, axis=1)
+                    dists = np.linalg.norm(centroids - a, axis=1)
                     ix_of_tracked_component = np.argmin(dists)
                     if dists[ix_of_tracked_component] > CcThreshold.TRACK_DIST_THRESH.value:
                         self.prev_frame_success = False
@@ -107,6 +110,9 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
             if SilhouetteExtractor.DRAW_FRAME_N:
                 cv2.putText(foreground, str(self.cur_frame_number), (0, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                             (255, 255, 0))
+            if SilhouetteExtractor.DRAW_VALUE:
+                cv2.putText(foreground, str(self.value), (0, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                            (0, 255, 0))
 
     def save_results(self, verbose=False):
         largest_component_sizes = np.array(self.result_data)
