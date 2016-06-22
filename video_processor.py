@@ -6,6 +6,7 @@ import sys
 import time
 import datetime
 import os.path
+from getpass import getuser
 from yaml import load, dump
 
 try:
@@ -48,8 +49,8 @@ class VideoProcessor(metaclass=ABCMeta):
             stream = open("settings.yaml", mode='r')
             self.settings = load(stream, Loader=Loader)
             stream.close()
-            self.datapath = self.settings['datapath']
-            print(self.datapath)
+            self.datapath = self.settings['datapath'].replace("<current_user>", getuser())
+            print("Processing path: ", self.datapath)
             if 'raw_options' in self.settings:
                 raw_options = self.settings['raw_options']
                 if self.in_video in raw_options:
