@@ -1,0 +1,2 @@
+lu_util exec '/tmp/fuse_d/sync/sw.sh'
+t app key record
