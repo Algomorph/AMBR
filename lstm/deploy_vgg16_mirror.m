@@ -22,7 +22,7 @@ end
 
 for si = 1 : length(subjects)
     
-    out_file = sprintf('%s/%s_feats.mat', out_dir, subjects{si});
+    out_file = sprintf('%s/%s_feats.mcat', out_dir, subjects{si});
     bbox_file = sprintf('%s/mirror_%s_bbox.txt', data_root, subjects{si});
     patch_dir = sprintf('%s/mirror_%s_patch', data_root, subjects{si});
     
