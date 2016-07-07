@@ -30,7 +30,7 @@ net = caffe.Net(model_def,      # defines the structure of the model
 # load the mean ImageNet image (as distributed with Caffe) for subtraction
 mu = np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy')
 mu = mu.mean(1).mean(1)  # average over pixels to obtain the mean (BGR) pixel values
-print 'mean-subtracted values:', zip('BGR', mu)
+print('mean-subtracted values:', zip('BGR', mu))
 
 # create transformer for the input called 'data'
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
@@ -59,13 +59,13 @@ output_prob = output['prob'][0]  # the output probability vector for the first i
 
 
 for layer_name, blob in net.blobs.iteritems():
-    print layer_name + '\t' + str(blob.data.shape)
+    print(layer_name + '\t' + str(blob.data.shape))
 
 for layer_name, param in net.params.iteritems():
-    print layer_name + '\t' + str(param[0].data.shape), str(param[1].data.shape)
+    print(layer_name + '\t' + str(param[0].data.shape), str(param[1].data.shape))
 
 feat = net.blobs['fc7'].data[0] # features from fc7 layer
-print feat.shape # size of the feature
+print(feat.shape) # size of the feature
 
 ## plotting 4096 features in histogram
 plt.subplot(2, 1, 1)

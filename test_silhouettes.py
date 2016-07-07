@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from subtract_background_from_video import Label
+from subtract_background_from_video import MaskLabel
 from extract_silhouettes import SilhouetteExtractor
 import cv2
 import numpy as np
@@ -77,8 +77,8 @@ class SilhouetteTester(SilhouetteExtractor):
             gt_mask = cv2.imread(gt_file_path, cv2.IMREAD_GRAYSCALE)
             self.gt_frame_ix += 1  # advance for next hit
             test_mask = self.mask.copy()
-            test_mask[test_mask < Label.PERSISTENCE_LABEL.value] = 0
-            test_mask[test_mask >= Label.PERSISTENCE_LABEL.value] = 1
+            test_mask[test_mask < MaskLabel.PERSISTENCE_LABEL.value] = 0
+            test_mask[test_mask >= MaskLabel.PERSISTENCE_LABEL.value] = 1
             gt_mask[gt_mask == 255] = 1
             test_mask = test_mask.astype(np.int8)  # to allow subtraction
             errors = test_mask - gt_mask

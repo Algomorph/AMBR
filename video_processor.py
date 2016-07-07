@@ -28,17 +28,18 @@ class VideoProcessor(metaclass=ABCMeta):
                                                                              eta.strftime("%H:%M:%S")))
 
     @staticmethod
-    def make_parser(help_string):
+    def make_parser(help_string, with_output=True):
         parser = ArgumentParser(help_string, formatter_class=ArgumentDefaultsHelpFormatter)
         parser.add_argument("in_video")
-        parser.add_argument("-o", "--out_video", default="")
+        if with_output:
+            parser.add_argument("-o", "--out_video", default="")
         parser.add_argument("-s", "--start_from", type=int, default=0)
         parser.add_argument("-e", "--end_with", type=int, default=-1)
         parser.add_argument("-c", "--frame_count", type=int, default=-1)
         parser.add_argument("-np", "--no-progress-bar", action='store_true', default=False)
         return parser
 
-    def __init__(self, args, out_postfix):
+    def __init__(self, args, out_postfix="_out", with_output_video=True):
         self.global_video_offset = 0
         self.flip_video = False
         self.datapath = "./"
@@ -71,16 +72,19 @@ class VideoProcessor(metaclass=ABCMeta):
                       .format(self.end_with, last_frame))
                 self.end_with = last_frame
 
-        if self.out_video == "":
-            self.out_video = args.in_video[:-4] + "_" + out_postfix + ".mp4"
+        if with_output_video:
+            if self.out_video == "":
+                self.out_video = args.in_video[:-4] + "_" + out_postfix + ".mp4"
 
-        self.writer = cv2.VideoWriter(os.path.join(self.datapath, self.out_video),
-                                      cv2.VideoWriter_fourcc('X', '2', '6', '4'),
-                                      self.cap.get(cv2.CAP_PROP_FPS),
-                                      (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                                       int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))),
-                                      True)
-        self.writer.set(cv2.VIDEOWRITER_PROP_NSTRIPES, cpu_count())
+            self.writer = cv2.VideoWriter(os.path.join(self.datapath, self.out_video),
+                                          cv2.VideoWriter_fourcc('X', '2', '6', '4'),
+                                          self.cap.get(cv2.CAP_PROP_FPS),
+                                          (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                                           int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))),
+                                          True)
+            self.writer.set(cv2.VIDEOWRITER_PROP_NSTRIPES, cpu_count())
+        else:
+            self.writer = None
 
         self.frame = None
         self.cur_frame_number = None
