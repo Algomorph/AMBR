@@ -28,11 +28,12 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
         mask, bin_mask, contour_found, dist, tracked_px_count, tracked_object_stats, largest_centroid \
             = self.background_subtractor.extract_tracked_object(self.frame,
                                                                 self.prev_frame_centroid)
+        self.mask = mask
         foreground = super().extract_foreground()
         if contour_found:
-            self.draw_silhouette(foreground, tracked_object_stats, largest_centroid, dist)
+            self.draw_silhouette(foreground, bin_mask, tracked_object_stats, largest_centroid, dist)
             self.prev_frame_centroid = largest_centroid
-            bbox_w_h_ratio = self.largest_cc_stats[cv2.CC_STAT_WIDTH] / self.largest_cc_stats[cv2.CC_STAT_HEIGHT]
+            bbox_w_h_ratio = tracked_object_stats[cv2.CC_STAT_WIDTH] / tracked_object_stats[cv2.CC_STAT_HEIGHT]
             self.result_data.append((self.cur_frame_number, tracked_px_count, bbox_w_h_ratio, largest_centroid[0],
                                      largest_centroid[1], float(contour_found)))
         else:
@@ -40,6 +41,10 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
             self.result_data.append((self.cur_frame_number, 0, -1.0, -1., -1., 0.0))
         self.mask_writer.write(mask)
         self.foreground_writer.write(foreground)
+
+    @staticmethod
+    def __to_int_tuple(np_array):
+        return int(round(np_array[0])), int(round(np_array[1]))
 
     def draw_silhouette(self, foreground, bin_mask, tracked_object_stats, centroid, value):
         contours = cv2.findContours(bin_mask, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)[1]
@@ -52,7 +57,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
             y1 = tracked_object_stats[cv2.CC_STAT_TOP]
             y2 = y1 + tracked_object_stats[cv2.CC_STAT_HEIGHT]
             cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
-            cv2.drawMarker(foreground, centroid, (0, 0, 255), cv2.MARKER_CROSS, 11)
+            cv2.drawMarker(foreground, SilhouetteExtractor.__to_int_tuple(centroid), (0, 0, 255), cv2.MARKER_CROSS, 11)
             bbox_w_h_ratio = tracked_object_stats[cv2.CC_STAT_WIDTH] / tracked_object_stats[cv2.CC_STAT_HEIGHT]
             cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1 - 18),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255))

@@ -70,6 +70,7 @@ class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
         return parser
 
     def __init__(self, args, main_out_vid_name="foreground"):
+        self.mask_writer = None
         super().__init__(args, main_out_vid_name)
         if args.mask_output_video == "":
             args.mask_output_video = args.in_video[:-4] + "_bs_mask.mp4"
@@ -88,7 +89,8 @@ class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
 
     def __del__(self):
         super().__del__()
-        self.mask_writer.release()
+        if self.mask_writer is not None:
+            self.mask_writer.release()
 
     def extract_foreground(self):
         foreground = self.frame.copy()
