@@ -27,10 +27,12 @@ class MaskLabel(Enum):
     SHADOW_LABEL = 80
     BACKGROUND_LABEL = 0
 
+
 class ConnectedComponentThreshold(Enum):
     HIDDEN = 1200
     BBOX_THRESH = 6500
     TRACK_DIST_THRESH = 60.
+
 
 class BackgroundSubtractor():
     @staticmethod
@@ -92,3 +94,55 @@ class BackgroundSubtractor():
         else:
             self.prelim_mask = None
         self.mask = None
+
+    def pretrain(self, image):
+        if self.prelim_mask is not None:
+            image = self.prelim_mask & image
+        self.subtractor.apply(image)
+
+    def extract_foreground_mask(self, image):
+        if self.prelim_mask is not None:
+            image = self.prelim_mask & image
+        return self.subtractor.apply(image)
+
+    def extract_tracked_object(self, image, prev_cc_center):
+        contour_found = False
+        dist = 0.0
+        tracked_px_count = 0
+        tracked_object_stats = None
+        largest_centroid = None
+
+        mask = self.extract_foreground_mask(image)
+
+        bin_mask = mask.copy()
+        bin_mask[bin_mask < MaskLabel.PERSISTENCE_LABEL.value] = 0
+        bin_mask[bin_mask > 0] = 1
+
+        labels, stats, centroids = cv2.connectedComponentsWithStats(bin_mask, ltype=cv2.CV_16U)[1:4]
+
+        if len(stats) > 1:
+            # initially, just grab the biggest connected component
+            ix_of_tracked_component = np.argmax(stats[1:, 4]) + 1
+            largest_centroid = centroids[ix_of_tracked_component].copy()
+            tracking_ok = True
+
+            if prev_cc_center is not None:
+                a = prev_cc_center
+                b = largest_centroid
+                dist = np.linalg.norm(a - b)
+                # check to make sure we're not too far from the previously-detected blob
+                if dist > 50:
+                    dists = np.linalg.norm(centroids - a, axis=1)
+                    ix_of_tracked_component = np.argmin(dists)
+                    if dists[ix_of_tracked_component] > ConnectedComponentThreshold.TRACK_DIST_THRESH.value:
+                        tracking_ok = False
+                    largest_centroid = centroids[ix_of_tracked_component].copy()
+
+            tracked_px_count = stats[ix_of_tracked_component, 4]
+            tracked_object_stats = stats[ix_of_tracked_component]
+            contour_found = tracked_px_count > ConnectedComponentThreshold.HIDDEN.value and tracking_ok
+
+            if contour_found:
+                bin_mask[labels != ix_of_tracked_component] = 0
+                mask[bin_mask == 0] = 0
+        return mask, bin_mask, contour_found, dist, tracked_px_count, tracked_object_stats, largest_centroid

@@ -39,7 +39,7 @@ class VideoProcessor(metaclass=ABCMeta):
         parser.add_argument("-np", "--no-progress-bar", action='store_true', default=False)
         return parser
 
-    def __init__(self, args, out_postfix="_out", with_output_video=True):
+    def __init__(self, args, out_postfix="_out", with_video_output=True):
         self.global_video_offset = 0
         self.flip_video = False
         self.datapath = "./"
@@ -72,7 +72,7 @@ class VideoProcessor(metaclass=ABCMeta):
                       .format(self.end_with, last_frame))
                 self.end_with = last_frame
 
-        if with_output_video:
+        if with_video_output:
             if self.out_video == "":
                 self.out_video = args.in_video[:-4] + "_" + out_postfix + ".mp4"
 

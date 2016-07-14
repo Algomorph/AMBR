@@ -12,6 +12,8 @@ from background_subtractor import BackgroundSubtractor, MaskLabel
 class BaseVideoBackgroundSubtractor(VideoProcessor):
     def __init__(self, args, main_out_vid_name="", with_video_output=True):
         super().__init__(args, main_out_vid_name, with_video_output)
+        args.datapath = self.datapath
+        self.background_subtractor = BackgroundSubtractor(args)
 
     def initialize(self, verbose=True):
         start = self.sampling_interval_start_frame
@@ -81,7 +83,6 @@ class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
 
         self.mask_writer.set(cv2.VIDEOWRITER_PROP_NSTRIPES, cpu_count())
         self.foreground_writer = self.writer
-        self.background_subtractor = BackgroundSubtractor(args)
         self.foreground = None
         self.mask = None
 
@@ -95,7 +96,7 @@ class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
         return foreground
 
     def process_frame(self):
-        self.mask = self.background_subtractor.extract_foreground_mask()
+        self.mask = self.background_subtractor.extract_foreground_mask(self.frame)
         self.foreground = self.extract_foreground()
         self.mask_writer.write(self.mask)
         self.foreground_writer.write(self.foreground)

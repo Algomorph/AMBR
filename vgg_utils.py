@@ -34,8 +34,8 @@ def transform_image(img, over_sample=False, mean_pix=[103.939, 116.779, 123.68],
     # crop
     indices_y = [0, img.shape[0] - crop_dim]
     indices_x = [0, img.shape[1] - crop_dim]
-    center_y = np.floor(indices_y[1] / 2)
-    center_x = np.floor(indices_x[1] / 2)
+    center_y = int(np.floor(indices_y[1] / 2))
+    center_x = int(np.floor(indices_x[1] / 2))
 
     imgs[0] = img[center_y:center_y + crop_dim, center_x:center_x + crop_dim, :]
     if over_sample:
@@ -66,14 +66,15 @@ class VGGFeatureExtractor(caffe.Net):
     ilsvrc_2012_mean = [104.00698793, 116.66876762, 122.67891434]
 
     def __init__(self, model_file=os.path.join(default_vgg_model_path, default_model_definition_file),
-                 pretrained_file=os.path.join(default_vgg_model_path, default_model_definition_file), img_dim=256,
+                 pretrained_file=os.path.join(default_vgg_model_path, default_pretrained_model_file), img_dim=256,
                  crop_dim=224, mean=ilsvrc_2012_mean, oversample=False):
-        super().__init__(self, model_file, pretrained_file, caffe.TEST)
+
+        super().__init__(model_file, pretrained_file, caffe.TEST)
         self.img_dim = img_dim
         self.crop_dim = crop_dim
         self.mean = mean
         self.oversample = oversample
-        self.batch_size = 10  # hard coded, same as oversample patches
+        self.batch_size = 10  # hard-coded, same as oversample patches
 
     def extract(self, images, blobs=['fc6', 'fc7']):
         features = {}
@@ -93,16 +94,14 @@ class VGGFeatureExtractor(caffe.Net):
 
     def extract_single(self, img, blobs=['fc6', 'fc7']):
         features = {}
-        for blob in blobs:
-            features[blob] = []
         data = transform_image(img, self.oversample, self.mean, self.img_dim, self.crop_dim)
-        out = self.forward(**{self.inputs[0]: data, 'blobs': blobs})
+        out = self.forward_all(**{self.inputs[0]: data, 'blobs': blobs})
         for blob in blobs:
             feat = out[blob]
             if self.oversample:
                 feat = feat.reshape((len(feat) / self.batch_size, self.batch_size, -1))
                 feat = feat.mean(1)
-            features[blob].append(feat.flatten())
+            features[blob] = feat.flatten()
         return features
 
     def _process_batch(self, data, feats, blobs):
