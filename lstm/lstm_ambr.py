@@ -1,8 +1,9 @@
+#!/usr/bin/python3
 '''
 Build a tweet sentiment analyzer
 '''
 from collections import OrderedDict
-import cPickle as pkl
+import pickle as pkl
 import os
 import sys
 import time
@@ -16,12 +17,12 @@ import theano.tensor as tensor
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 # from util import *
-import data_ambr as data
+import lstm.data_ambr as data
 
 import pylab
 import matplotlib as mpl
-mpl.rcParams['image.interpolation'] = 'nearest'
 
+mpl.rcParams['image.interpolation'] = 'nearest'
 
 # Set the random number generators' seeds for consistency
 # SEED = 123
@@ -47,21 +48,21 @@ def get_minibatches_idx(n, minibatch_size, shuffle=False):
     minibatch_start = 0
     for i in range(n // minibatch_size):
         minibatches.append(idx_list[minibatch_start:
-                                    minibatch_start + minibatch_size])
+        minibatch_start + minibatch_size])
         minibatch_start += minibatch_size
 
     if (minibatch_start != n):
         # Make a minibatch out of what is left
         minibatches.append(idx_list[minibatch_start:])
 
-    return zip(range(len(minibatches)), minibatches)
+    return list(zip(list(range(len(minibatches))), minibatches))
 
 
 def zipp(params, tparams):
     """
     When we reload the model. Needed for the GPU stuff.
     """
-    for kk, vv in params.iteritems():
+    for kk, vv in params.items():
         tparams[kk].set_value(vv)
 
 
@@ -70,14 +71,14 @@ def unzip(zipped):
     When we pickle the model. Needed for the GPU stuff.
     """
     new_params = OrderedDict()
-    for kk, vv in zipped.iteritems():
+    for kk, vv in zipped.items():
         new_params[kk] = vv.get_value()
     return new_params
 
 
-
 def grad_array(tgrad):
     return [np.asarray(g) for g in tgrad]
+
 
 def dropout_layer(state_before, use_noise, trng):
     proj = tensor.switch(use_noise,
@@ -99,15 +100,15 @@ def init_params(options):
     """
     params = OrderedDict()
     # embedding
-    randn = np.random.rand(options['feat_dim'],
-                              options['dim_proj'])
+    randn = np.random.rand(options['feature_count'],
+                           options["hidden_unit_count"])
     params['Wemb'] = (0.01 * randn).astype(config.floatX)
     params = get_layer(options['encoder'])[0](options,
                                               params,
                                               prefix=options['encoder'])
     # classifier
-    params['U'] = 0.01 * np.random.randn(options['dim_proj'],
-                                            options['ydim']).astype(config.floatX)
+    params['U'] = 0.01 * np.random.randn(options["hidden_unit_count"],
+                                         options['ydim']).astype(config.floatX)
     params['b'] = np.zeros((options['ydim'],)).astype(config.floatX)
 
     return params
@@ -115,7 +116,7 @@ def init_params(options):
 
 def load_params(path, params):
     pp = np.load(path)
-    for kk, vv in params.iteritems():
+    for kk, vv in params.items():
         if kk not in pp:
             raise Warning('%s is not in the archive' % kk)
         params[kk] = pp[kk]
@@ -125,7 +126,7 @@ def load_params(path, params):
 
 def init_tparams(params):
     tparams = OrderedDict()
-    for kk, pp in params.iteritems():
+    for kk, pp in params.items():
         tparams[kk] = theano.shared(params[kk], name=kk)
     return tparams
 
@@ -147,23 +148,23 @@ def param_init_lstm(options, params, prefix='lstm'):
 
     :see: init_params
     """
-    W = np.concatenate([ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj'])], axis=1)
+    W = np.concatenate([ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"])], axis=1)
     params[_p(prefix, 'W')] = W
-    U = np.concatenate([ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj']),
-                           ortho_weight(options['dim_proj'])], axis=1)
+    U = np.concatenate([ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"]),
+                        ortho_weight(options["hidden_unit_count"])], axis=1)
     params[_p(prefix, 'U')] = U
-    b = np.zeros((4 * options['dim_proj'],))
+    b = np.zeros((4 * options["hidden_unit_count"],))
     params[_p(prefix, 'b')] = b.astype(config.floatX)
 
     return params
 
 
-def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None, 
+def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
                init_h=None, init_c=None):
     nsteps = state_below.shape[0]
     if state_below.ndim == 3:
@@ -182,11 +183,11 @@ def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
         preact = tensor.dot(h_, tparams[_p(prefix, 'U')])
         preact += x_
 
-        i = tensor.nnet.sigmoid(_slice(preact, 0, options['dim_proj']))
-        f = tensor.nnet.sigmoid(_slice(preact, 1, options['dim_proj']))
-        o = tensor.nnet.sigmoid(_slice(preact, 2, options['dim_proj']))
-        c = tensor.tanh(_slice(preact, 3, options['dim_proj']))
-        # c = tensor.maximum(_slice(preact, 3, options['dim_proj']), 0.0)
+        i = tensor.nnet.sigmoid(_slice(preact, 0, options["hidden_unit_count"]))
+        f = tensor.nnet.sigmoid(_slice(preact, 1, options["hidden_unit_count"]))
+        o = tensor.nnet.sigmoid(_slice(preact, 2, options["hidden_unit_count"]))
+        c = tensor.tanh(_slice(preact, 3, options["hidden_unit_count"]))
+        # c = tensor.maximum(_slice(preact, 3, options["hidden_unit_count"]), 0.0)
 
         c = f * c_ + i * c
         # c = (f * c_ + i * c) * 0.5
@@ -201,7 +202,7 @@ def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
     state_below = (tensor.dot(state_below, tparams[_p(prefix, 'W')]) +
                    tparams[_p(prefix, 'b')])
 
-    dim_proj = options['dim_proj']
+    dim_proj = options["hidden_unit_count"]
 
     if not init_h:
         init_h = tensor.alloc(numpy_floatX(0.), n_samples, dim_proj)
@@ -234,7 +235,7 @@ def sgd(lr, tparams, grads, x, mask, y, cost):
     # New set of shared variable that will contain the gradient
     # for a mini-batch.
     gshared = [theano.shared(p.get_value() * 0., name='%s_grad' % k)
-               for k, p in tparams.iteritems()]
+               for k, p in tparams.items()]
     gsup = [(gs, g) for gs, g in zip(gshared, grads)]
 
     # Function that computes gradients for a mini-batch, but do not
@@ -242,7 +243,7 @@ def sgd(lr, tparams, grads, x, mask, y, cost):
     f_grad_shared = theano.function([x, mask, y], cost, updates=gsup,
                                     name='sgd_f_grad_shared')
 
-    pup = [(p, p - lr * g) for p, g in zip(tparams.values(), gshared)]
+    pup = [(p, p - lr * g) for p, g in zip(list(tparams.values()), gshared)]
 
     # Function that updates the weights from the previously computed
     # gradient.
@@ -283,13 +284,13 @@ def adadelta(lr, tparams, grads, x, mask, y, cost):
 
     zipped_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
                                   name='%s_grad' % k)
-                    for k, p in tparams.iteritems()]
+                    for k, p in tparams.items()]
     running_up2 = [theano.shared(p.get_value() * numpy_floatX(0.),
                                  name='%s_rup2' % k)
-                   for k, p in tparams.iteritems()]
+                   for k, p in tparams.items()]
     running_grads2 = [theano.shared(p.get_value() * numpy_floatX(0.),
                                     name='%s_rgrad2' % k)
-                      for k, p in tparams.iteritems()]
+                      for k, p in tparams.items()]
 
     zgup = [(zg, g) for zg, g in zip(zipped_grads, grads)]
     rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
@@ -304,7 +305,7 @@ def adadelta(lr, tparams, grads, x, mask, y, cost):
                                      running_grads2)]
     ru2up = [(ru2, 0.95 * ru2 + 0.05 * (ud ** 2))
              for ru2, ud in zip(running_up2, updir)]
-    param_up = [(p, p + ud) for p, ud in zip(tparams.values(), updir)]
+    param_up = [(p, p + ud) for p, ud in zip(list(tparams.values()), updir)]
 
     f_update = theano.function([lr], [], updates=ru2up + param_up,
                                on_unused_input='ignore',
@@ -346,13 +347,13 @@ def rmsprop(lr, tparams, grads, x, mask, y, cost):
 
     zipped_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
                                   name='%s_grad' % k)
-                    for k, p in tparams.iteritems()]
+                    for k, p in tparams.items()]
     running_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
                                    name='%s_rgrad' % k)
-                     for k, p in tparams.iteritems()]
+                     for k, p in tparams.items()]
     running_grads2 = [theano.shared(p.get_value() * numpy_floatX(0.),
                                     name='%s_rgrad2' % k)
-                      for k, p in tparams.iteritems()]
+                      for k, p in tparams.items()]
 
     zgup = [(zg, g) for zg, g in zip(zipped_grads, grads)]
     rgup = [(rg, 0.95 * rg + 0.05 * g) for rg, g in zip(running_grads, grads)]
@@ -365,20 +366,20 @@ def rmsprop(lr, tparams, grads, x, mask, y, cost):
 
     updir = [theano.shared(p.get_value() * numpy_floatX(0.),
                            name='%s_updir' % k)
-             for k, p in tparams.iteritems()]
+             for k, p in tparams.items()]
     updir_new = [(ud, 0.9 * ud - 1e-4 * zg / tensor.sqrt(rg2 - rg ** 2 + 1e-4))
                  for ud, zg, rg, rg2 in zip(updir, zipped_grads, running_grads,
                                             running_grads2)]
     param_up = [(p, p + udn[1])
-                for p, udn in zip(tparams.values(), updir_new)]
+                for p, udn in zip(list(tparams.values()), updir_new)]
     f_update = theano.function([lr], [], updates=updir_new + param_up,
                                on_unused_input='ignore',
                                name='rmsprop_f_update')
 
     return f_grad_shared, f_update
 
-def get_datasets():
 
+def get_datasets():
     # data.test_subect_list = [test_subject]
     return (data.load_data, data.prepare_data)
 
@@ -396,15 +397,15 @@ def build_model(tparams, options):
     n_timesteps = x.shape[0]
     n_samples = x.shape[1]
 
-#    emb = tparams['Wemb'][x.flatten()].reshape([n_timesteps,
-#                                                n_samples,
-#                                                options['dim_proj']])
+    #    emb = tparams['Wemb'][x.flatten()].reshape([n_timesteps,
+    #                                                n_samples,
+    #                                                options["hidden_unit_count"]])
 
-#    randn = np.random.rand(options['feat_dim'],
-#                              options['dim_proj'])
-#    fixed_wemb = (0.01 * randn).astype(config.floatX)
-#    fixed_wemb_shared = theano.shared(fixed_wemb, "fixed_wemb")
-#    emb = theano.dot(x, fixed_wemb_shared)
+    #    randn = np.random.rand(options['feature_count'],
+    #                              options["hidden_unit_count"])
+    #    fixed_wemb = (0.01 * randn).astype(config.floatX)
+    #    fixed_wemb_shared = theano.shared(fixed_wemb, "fixed_wemb")
+    #    emb = theano.dot(x, fixed_wemb_shared)
 
     emb = theano.dot(x, tparams['Wemb'])
     rval = get_layer(options['encoder'])[1](tparams, emb, options,
@@ -417,7 +418,7 @@ def build_model(tparams, options):
         # mean pooling
         wg = tensor.arange(n_timesteps).astype(config.floatX)
         wg = wg[:, None] / mask.sum(axis=0)
-        proj_all_raw = proj_all_raw * mask[:, :, None] 
+        proj_all_raw = proj_all_raw * mask[:, :, None]
         proj_all = proj_all_raw * wg[:, :, None]
         proj = proj_all.sum(axis=0)
         proj = proj / mask.sum(axis=0)[:, None]
@@ -429,17 +430,16 @@ def build_model(tparams, options):
     f_pred_prob = theano.function([x, mask], pred, name='f_pred_prob')
     f_pred = theano.function([x, mask], pred.argmax(axis=1), name='f_pred')
 
-
     def onestep_softmax(proj):
         return tensor.nnet.softmax(proj)
 
     out_proj_all = tensor.dot(proj_all, tparams['U']) + tparams['b']
-    pred_all, updates = theano.scan(onestep_softmax, 
-                                sequences=[out_proj_all],
-                                non_sequences=None,
-                                n_steps=n_timesteps
-                                )
-    
+    pred_all, updates = theano.scan(onestep_softmax,
+                                    sequences=[out_proj_all],
+                                    non_sequences=None,
+                                    n_steps=n_timesteps
+                                    )
+
     # min_val = out_proj_all.min(axis=2)
     # max_val = out_proj_all.max(axis=2)
     # out_proj_all = (out_proj_all + min_val[:,:,None])/(max_val-min_val)[:,:,None]
@@ -448,14 +448,13 @@ def build_model(tparams, options):
 
     f_pred_prob_all = theano.function([x, mask], pred_all, name='f_pred_prob_all')
 
-    hidden_all = [proj_all_raw, c, i, f, o, 
-                    tparams[_p(options['encoder'], 'W')], 
-                    tparams[_p(options['encoder'], 'U')], 
-                    tparams[_p(options['encoder'], 'b')], 
-                    tparams['U'], tparams['b'], tparams['Wemb'] ]  # 10 in total
+    hidden_all = [proj_all_raw, c, i, f, o,
+                  tparams[_p(options['encoder'], 'W')],
+                  tparams[_p(options['encoder'], 'U')],
+                  tparams[_p(options['encoder'], 'b')],
+                  tparams['U'], tparams['b'], tparams['Wemb']]  # 10 in total
 
     hidden_status = theano.function([x, mask], hidden_all, name='hidden_status')
-
 
     off = 1e-8
     if pred.dtype == 'float16':
@@ -482,8 +481,7 @@ def pred_error(f_pred, prepare_data, data, iterator, verbose=False, show_hs=Fals
 
     valid_err = 1. - numpy_floatX(valid_err) / len(data[0])
 
-
-    if show_hs and not hs_func is None: 
+    if show_hs and not hs_func is None:
         # x = data[0][0][:,None,:].astype('float32')
         # mask = np.ones((x.shape[0], 1), dtype='float32')
         # hs = hs_func(x, mask)
@@ -491,58 +489,57 @@ def pred_error(f_pred, prepare_data, data, iterator, verbose=False, show_hs=Fals
         # pylab.imshow(np.squeeze(hs[:,0,:]))
         # pylab.colorbar()
 
-        x = data[0][0][:,None,:].astype('float32')
+        x = data[0][0][:, None, :].astype('float32')
         mask = np.ones((x.shape[0], 1), dtype='float32')
         # h, c, i, f, o
-        hs = hs_func(x, mask)  
+        hs = hs_func(x, mask)
         # hs_all = np.concatenate(hspylab.clf(), axis=2)
         pylab.figure(1)
         pylab.clf()
-        for s in xrange(5): 
-            pylab.subplot(1,5,s+1)
-            pylab.imshow(np.squeeze(hs[s][:,0,:]), interpolation='nearest')
+        for s in range(5):
+            pylab.subplot(1, 5, s + 1)
+            pylab.imshow(np.squeeze(hs[s][:, 0, :]), interpolation='nearest')
             pylab.colorbar()
 
         pylab.savefig("hs_test_tmp.png")
 
-        pylab.figure(2); pylab.clf()
-        pylab.subplot(3,1,1)
+        pylab.figure(2);
+        pylab.clf()
+        pylab.subplot(3, 1, 1)
         pylab.imshow(hs[5], interpolation='nearest')
         pylab.colorbar()
         pylab.title("hs_Wmatrix_lstm")
 
-        pylab.subplot(3,1,2)
+        pylab.subplot(3, 1, 2)
         pylab.imshow(hs[6], interpolation='nearest')
         pylab.colorbar()
         pylab.title("hs_Umatrix_lstm")
 
-        pylab.subplot(3,1,3)
+        pylab.subplot(3, 1, 3)
         pylab.imshow(hs[8], interpolation='nearest')
         pylab.colorbar()
         pylab.title("hs_Umatrix")
         pylab.savefig("hs_matrix.png")
 
-        pylab.figure(3); pylab.clf()
-        pylab.subplot(2,1,1)
+        pylab.figure(3);
+        pylab.clf()
+        pylab.subplot(2, 1, 1)
         pylab.plot(hs[7])
         pylab.title("hs_Bvec_lstm")
-        pylab.subplot(2,1,2)
+        pylab.subplot(2, 1, 2)
         pylab.plot(hs[9])
         pylab.title("hs_Bvec")
         pylab.savefig("hs_vector.png")
 
         time.sleep(0.1)
 
-
     return valid_err
 
 
-def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, nCls, verbose=False):
-
+def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, category_count, verbose=False):
     n_samples = len(data[0])
-    feat_dim = data[0][0].shape[1]
-    probs = np.zeros((n_samples, nCls)).astype(config.floatX)
-    gts = np.zeros((n_samples, )).astype('int32')
+    probabilities = np.zeros((n_samples, category_count)).astype(config.floatX)
+    gts = np.zeros((n_samples,)).astype('int32')
 
     n_done = 0
 
@@ -550,50 +547,48 @@ def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, nCls, verbose=False
         x, mask, y = prepare_data([data[0][t] for t in valid_index],
                                   np.array(data[1])[valid_index])
         pred_probs = f_pred_prob(x, mask)
-        probs[valid_index, :] = pred_probs
+        probabilities[valid_index, :] = pred_probs
         gts[valid_index] = np.array(data[1])[valid_index]
 
         n_done += len(valid_index)
 
-    preds = np.argmax(probs, axis=1)
-    cm = confusion_matrix(gts, preds, nCls)
+    preds = np.argmax(probabilities, axis=1)
+    cm = confusion_matrix(gts, preds, category_count)
     tp = np.diagonal(cm)
     cls_count = np.sum(cm, axis=0)
-    fp = np.sum(cm, axis=1)-tp
-    fn = cls_count-tp
+    fp = np.sum(cm, axis=1) - tp
+    fn = cls_count - tp
 
     prectmp = tp / (tp + fp)
-    prectmp[np.where(tp==0)[0]] = 0
-    prectmp[np.where(cls_count==0)[0]] = float('nan')
+    prectmp[np.where(tp == 0)[0]] = 0
+    prectmp[np.where(cls_count == 0)[0]] = float('nan')
     prec = np.nanmean(prectmp)
 
-    rectmp  = tp / (tp + fn)
-    rectmp[np.where(tp==0)[0]] = 0
-    rectmp[np.where(cls_count==0)[0]] = float('nan')
+    rectmp = tp / (tp + fn)
+    rectmp[np.where(tp == 0)[0]] = 0
+    rectmp[np.where(cls_count == 0)[0]] = float('nan')
     rec = np.nanmean(rectmp)
 
-    return probs, gts, prec, rec
+    return probabilities, gts, prec, rec
 
 
 def test_lstm(
-    test_subject, 
-    model_file,   # the file to save the model
-    options,
-    metadata,
-    result_dir=None
+        test_subject,
+        model_file,  # the file to save the model
+        options,
+        metadata,
+        result_dir=None
 ):
-
     load_data, prepare_data = get_datasets()
 
     options['model_file'] = model_file
-    print "model options", options
-    print 'Loading test data'
+    print("model options", options)
+    print('Loading test data')
     train, valid, test = load_data([test_subject])
 
-    print "%d train examples" % len(train[0])
-    print "%d valid examples" % len(valid[0])
-    print "%d test examples" % len(test[0])
-
+    print("%d train examples" % len(train[0]))
+    print("%d valid examples" % len(valid[0]))
+    print("%d test examples" % len(test[0]))
 
     if not result_dir:
         # result_dir = 'test_results_%s' % (metadata['suffix'])
@@ -608,7 +603,6 @@ def test_lstm(
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
-
     options['valid_batch_size'] = 1
     params = init_params(options)
     load_params(model_file, params)
@@ -617,12 +611,7 @@ def test_lstm(
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_model(tparams, options)
 
     kf_test = get_minibatches_idx(len(test[0]), options['valid_batch_size'])
-    print "%d test examples" % len(test[0])
-
-    test_err = 0
-#        for _, test_index in kf_test:
-#            x, mask, y = prepare_data([test[0][t] for t in test_index],
-#                                  np.array(test[1])[test_index])
+    print("%d test examples" % len(test[0]))
 
     probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, prepare_data, test, kf_test, options['ydim'], verbose=False)
     preds_all = np.argmax(probs, axis=1)
@@ -639,78 +628,54 @@ def test_lstm(
 
     # import pdb; pdb.set_trace()
 
-    results = {'scores': probs, 
-               'gts': gts, 
-               'prec': prec, 
+    results = {'scores': probs,
+               'gts': gts,
+               'prec': prec,
                'rec': rec}
     result_file = '%s/%s_result.mat' % (result_dir, model_file.split('/')[-1].split('.')[0])
     sio.savemat(result_file, results)
 
-
-    # # result_dir_stat = '%s/stat_sub%02d' % (result_dir, test_subject)
-    # result_dir_figs = '%s/figs_sub_%s' % (result_dir, test_subject)
-    # # if not os.path.exists(result_dir_stat):
-    #     # os.mkdir(result_dir_stat)
-    # if not os.path.exists(result_dir_figs):
-    #     os.mkdir(result_dir_figs)
-
     preds_all = []
-    meta_all = []
-    for t in xrange(len(test[0])):
+    for t in range(len(test[0])):
         x, mask, y = prepare_data([test[0][t]], np.array(test[1])[t])
         preds_all.append(f_pred_prob_all(x, mask))
-        # meta_all.append(test[2][t])
 
-    results_all = { 'preds_all': preds_all, 
-                    'gts': gts, 
-                    'start_frame': [d['start_frame'] for d in test[2]],
-                    'end_frame': [d['end_frame'] for d in test[2]],
-                    'attention_type': [d['attention_type'] for d in test[2]],
-                    'subject': [d['subject'] for d in test[2]],
-                    'object': [d['object'] for d in test[2]] }
-    
+    results_all = {'preds_all': preds_all,
+                   'gts': gts,
+                   'start_frame': [d['s_fid'] for d in test[2]],
+                   'end_frame': [d['e_fid'] for d in test[2]],
+                   'label': [d['label'] for d in test[2]]}
+
     results_all_file = '%s/%s_result_all.mat' % (result_dir, model_file.split('/')[-1].split('.')[0])
     sio.savemat(results_all_file, results_all)
-
-
-    #     fig = np.squeeze(preds[:,0,:])
-
-    #     pylab.figure(1)
-    #     pylab.clf()
-    #     pylab.imshow(fig); pylab.colorbar()
-    #     pylab.savefig("%s/pred_%d.png" % (result_dir_figs, t))
-    #     # time.sleep(0.5)
-
-    #     # import pdb; pdb.set_trace()
-
-    return;
+    return
 
 
 def train_lstm(
-    test_subject,
-    model_file,   # the file to save the model
-    options,
-    metadata, 
-    result_dir=None,
+        test_subject,
+        model_file,  # the file to save the model
+        options,
+        metadata,
+        result_dir=None,
 ):
     options['model_file'] = model_file
-    print "model options", options
+    print("model options", options)
     saveto = model_file
-    saveFreq = options['saveFreq']
-    validFreq = options['validFreq']
+    save_interval = options['save_interval']
+    validation_interval = options['validation_interval']
     optimizer = options['optimizer']
 
     load_data, prepare_data = get_datasets()
 
     test_subject_list = [test_subject]
 
-    print 'Loading data'
+    print('Loading data')
     train, valid, test = load_data(test_subject_list)
-    print "%d train examples" % len(train[0])
-    print "%d valid examples" % len(valid[0])
-    print "%d test examples" % len(test[0])
+    print("%d train examples" % len(train[0]))
+    print("%d valid examples" % len(valid[0]))
+    print("%d test examples" % len(test[0]))
 
-    print 'Building model'
+    print('Building model')
     # This create the initial parameters as np ndarrays.
     # Dict name (string) -> np ndarray
     params = init_params(options)
@@ -736,34 +701,33 @@ def train_lstm(
 
     f_cost = theano.function([x, mask, y], cost, name='f_cost')
 
-    grads = tensor.grad(cost, wrt=tparams.values())
+    grads = tensor.grad(cost, wrt=list(tparams.values()))
     f_grad = theano.function([x, mask, y], grads, name='f_grad')
 
     lr = tensor.scalar(name='lr')
     f_grad_shared, f_update = optimizer(lr, tparams, grads,
                                         x, mask, y, cost)
 
-    print 'Optimization'
+    print('Optimization')
 
     kf_valid = get_minibatches_idx(len(valid[0]), options['valid_batch_size'])
     kf_test = get_minibatches_idx(len(test[0]), options['valid_batch_size'])
 
-
     history_errs = []
-    eidx_a =[]
+    eidx_a = []
     best_p = None
     bad_count = 0
 
-    if validFreq == -1:
-        validFreq = len(train[0]) / options['batch_size']
-    if saveFreq == -1:
-        saveFreq = len(train[0]) / options['batch_size']
+    if validation_interval == -1:
+        validation_interval = len(train[0]) / options['batch_size']
+    if save_interval == -1:
+        save_interval = len(train[0]) / options['batch_size']
 
     uidx = 0  # the number of update done
     estop = False  # early stop
     start_time = time.time()
     try:
-        for eidx in xrange(options['max_epochs']):
+        for eidx in range(options['max_epochs']):
             n_samples = 0
 
             # Get new shuffled index for the training set.
@@ -775,7 +739,7 @@ def train_lstm(
 
                 # Select the random examples for this minibatch
                 y = [train[1][t] for t in train_index]
-                x = [train[0][t]for t in train_index]
+                x = [train[0][t] for t in train_index]
 
                 # Get the data in np.ndarray format
                 # This swap the axis!
@@ -792,17 +756,17 @@ def train_lstm(
                 # print 'parameter :', [np.mean(vv) for kk, vv in params.iteritems()]
 
                 cost = f_grad_shared(x, mask, y)
-                f_update(options['lrate'])
+                f_update(options['learning_rate'])
 
                 if np.isnan(cost) or np.isinf(cost):
-                    print 'NaN detected'
+                    print('NaN detected')
                     return 1., 1., 1.
 
-                if np.mod(uidx, options['dispFreq']) == 0:
-                    print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost
+                if np.mod(uidx, options['display_interval']) == 0:
+                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
 
-                if saveto and np.mod(uidx, saveFreq) == 0:
-                    print 'Saving...',
+                if saveto and np.mod(uidx, save_interval) == 0:
+                    print('Saving...', end=' ')
 
                     if best_p is not None:
                         params = best_p
@@ -810,10 +774,9 @@ def train_lstm(
                         params = unzip(tparams)
                     np.savez(saveto, history_errs=history_errs, **params)
                     pkl.dump(options, open('%s.pkl' % saveto, 'wb'), -1)
-                    print 'Done'
+                    print('Done')
 
-
-                if np.mod(uidx, options['validFreq']) == 0:
+                if np.mod(uidx, options['validation_interval']) == 0:
                     use_noise.set_value(0.)
                     train_err = pred_error(f_pred, prepare_data, train, kf)
                     valid_err = pred_error(f_pred, prepare_data, valid, kf_valid)
@@ -825,40 +788,39 @@ def train_lstm(
 
                     # import pdb; pdb.set_trace()
 
-                    pylab.figure(1); pylab.clf()
+                    pylab.figure(1);
+                    pylab.clf()
                     lines = pylab.plot(np.array(eidx_a), np.array(history_errs))
                     pylab.legend(lines, ['train', 'valid', 'test'])
                     pylab.savefig("err_%s.png" % (metadata['suffix']))
                     time.sleep(0.1)
 
-
                     if (uidx == 0 or
-                        valid_err <= np.array(history_errs)[:,1].min()):
+                                valid_err <= np.array(history_errs)[:, 1].min()):
 
                         best_p = unzip(tparams)
                         bad_counter = 0
-                        if valid_err < np.array(history_errs)[:,1].min():
-                            print '  New best validation results.'
+                        if valid_err < np.array(history_errs)[:, 1].min():
+                            print('  New best validation results.')
 
-                    print 'TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err)
+                    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err))
 
                     if (len(history_errs) > options['patience'] and
-                        valid_err >= np.array(history_errs)[:-options['patience'],
-                                                               1].min()):
+                                valid_err >= np.array(history_errs)[:-options['patience'],
+                                             1].min()):
                         bad_counter += 1
                         if bad_counter > options['patience']:
-                            print 'Early Stop!'
+                            print('Early Stop!')
                             estop = True
                             break
 
-
-            print 'Seen %d samples' % n_samples
+            print('Seen %d samples' % n_samples)
 
             if estop:
                 break
 
     except KeyboardInterrupt:
-        print "Training interupted"
+        print("Training interupted")
 
     end_time = time.time()
     if best_p is not None:
@@ -872,99 +834,90 @@ def train_lstm(
     valid_err = pred_error(f_pred, prepare_data, valid, kf_valid)
     test_err = pred_error(f_pred, prepare_data, test, kf_test)
 
-    print 'TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err)
+    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err))
     if saveto:
         np.savez(saveto, train_err=train_err,
-                    valid_err=valid_err, test_err=test_err,
-                    history_errs=history_errs, **best_p)
-    print 'The code run for %d epochs, with %f sec/epochs' % (
-        (eidx + 1), (end_time - start_time) / (1. * (eidx + 1)))
-    print >> sys.stderr, ('Training took %.1fs' %
-                          (end_time - start_time))
-    return train_err, valid_err, test_err    
+                 valid_err=valid_err, test_err=test_err,
+                 history_errs=history_errs, **best_p)
+    print('The code run for %d epochs, with %f sec/epochs' % (
+        (eidx + 1), (end_time - start_time) / (1. * (eidx + 1))))
+    print(('Training took %.1fs' %
+           (end_time - start_time)), file=sys.stderr)
+    return train_err, valid_err, test_err
 
 
 def confusion_matrix(gt, pred, nCls):
     cm = np.zeros((nCls, nCls))
-    for i in xrange(nCls):
-        idxCls = np.where(gt==i)[0]
+    for i in range(nCls):
+        idxCls = np.where(gt == i)[0]
         if idxCls.size == 0:
             continue
         predCls = pred[idxCls]
-        for j in xrange(nCls):
-            cm[j, i] = np.where(predCls==j)[0].shape[0]
+        for j in range(nCls):
+            cm[j, i] = np.where(predCls == j)[0].shape[0]
 
     return cm
+
 
 def test_confusion_matrix():
     from random import randint
     nCls = 10
     gt = np.tile(np.arange(nCls), (7, 1))
-    gt = np.reshape(gt.T, (gt.size, ))
-    pred = np.asarray([randint(0, nCls-1) for x in xrange(gt.size)])
+    gt = np.reshape(gt.T, (gt.size,))
+    pred = np.asarray([randint(0, nCls - 1) for x in range(gt.size)])
     cm = confusion_matrix(gt, pred, nCls)
 
     # print cm
-    print np.sum(cm, axis=0)
-    print np.sum(cm, axis=1)
+    print(np.sum(cm, axis=0))
+    print(np.sum(cm, axis=1))
     return cm
 
 
-def get_default_options(nCls):
-    dim_proj=128  # word embeding dimension and LSTM number of hidden units.
-    patience=15  # Number of epoch to wait before early stop if no progress
-    max_epochs=300  # The maximum number of epoch to run
-    dispFreq=50  # Display to stdout the training progress every N updates
-    decay_c=0.  # Weight decay for the classifier applied to the U weights.
-    lrate=0.0001  # Learning rate for sgd (not used for adadelta and rmsprop)
-    feat_dim=4096  # CNN feature dimension
-    #feat_dim = 8192 
-    optimizer=adadelta  # sgd, adadelta and rmsprop available, sgd very hard to use, not recommanded (probably need momentum and decaying learning rate).
-    encoder='lstm'  # TODO: can be removed must be lstm.
-    validFreq=20  # Compute the validation error after this number of update.
-    saveFreq=50  # Save the parameters after every saveFreq updates
-    batch_size=10  # The batch size during training.
-    valid_batch_size=5  # The batch size used for validation/test set.
+def get_default_options(category_count):
+    hidden_unit_count = 128  # word embeding dimension and LSTM number of hidden units.
+    patience = 15  # Number of epoch to wait before early stop if no progress
+    max_epochs = 300  # The maximum number of epoch to run
+    display_interval = 50  # Display to stdout the training progress every N updates
+    decay_c = 0.  # Weight decay for the classifier applied to the U weights.
+    learning_rate = 0.0001  # Learning rate for sgd (not used for adadelta and rmsprop)
+    feature_count = 4096  # CNN feature dimension
+    # feature_count = 8192
+    optimizer = adadelta  # sgd, adadelta and rmsprop available, sgd very hard to use, not recommanded (probably need momentum and decaying learning rate).
+    encoder = 'lstm'  # TODO: can be removed must be lstm.
+    validation_interval = 20  # Compute the validation error after this number of update.
+    save_interval = 50  # Save the parameters after every save_interval updates
+    batch_size = 10  # The batch size during training.
+    valid_batch_size = 5  # The batch size used for validation/test set.
 
     # Parameter for extra option
-    noise_std=0.
-    use_dropout=True  # if False slightly faster, but worst test error
-                       # This frequently need a bigger model.
-    reload_model=None  # Path to a saved model we want to start from.
-    ydim = nCls  # number of class
+    noise_std = 0.
+    use_dropout = True  # if False slightly faster, but worst test error
+    # This frequently need a bigger model.
+    reload_model = None  # Path to a saved model we want to start from.
+    ydim = category_count  # number of class
 
     options = locals().copy()
     return options
 
-def action_exp():
-    dim_proj = 64
-    feat_dim = 4096
-    #feat_dim = 8192
-    # model_dir = 'action_model'  # reserved as the first version
-    # model_dir = 'action_model2'
-    # model_dir = 'action_model3'
-    # model_dir = 'action_model4'
-    # model_dir = 'action_model5'
-    # model_dir = 'action_model6'   # 5 objs
-    # model_dir = 'action_model7'   # 6 objs
-    model_dir = 'action_model8'    # 5 objs
-    model_dir = 'action_model9'    # 5 objs
+
+def main():
+    hidden_unit_count = 64
+    feature_count = 4096
+    model_dir = 'action_model9'  # 5 objs
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    # nCls = 6*5
-    nCls = 5*5
-    options = get_default_options(nCls)
-    options['dim_proj'] = dim_proj;
-    options['feat_dim'] = feat_dim;
+    category_count = 5 * 5
+    options = get_default_options(category_count)
+    options["hidden_unit_count"] = hidden_unit_count
+    options['feature_count'] = feature_count
 
     metadata = {
         'exp_name': 'default',
         'suffix': 'default'
-        }
+    }
 
     subject_list = ['and', 'fer', 'gui', 'kos', 'mic']
-    # subject_list = ['kos']
 
     # training
     for test_subject in subject_list:
@@ -976,14 +929,15 @@ def action_exp():
         if not os.path.isfile(model_file):
             train_lstm(test_subject, model_file, options, metadata)
 
-    # testing
-    # for test_subject in subject_list:
+            # testing
+            # for test_subject in subject_list:
         test_lstm(test_subject, model_file, options, metadata)
+    return 0
 
 
 if __name__ == '__main__':
     pylab.ion()
-    action_exp()
+    sys.exit(main())
 
 # stdbuf -oL python lstm_exp2.py  2>&1 | tee log/train_exp_run2_ts`date +%s`.log
 # stdbuf -oL python lstm_exp2.py  2>&1 | tee log/train_exp_run8_obj5_ts`date +%s`.log
