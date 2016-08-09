@@ -21,7 +21,7 @@ class Arguments(Enum):
     # ================= WORK FOLDER, INPUT & OUTPUT FILES =============================================================#
     folder = Argument(default="./", arg_type=str, arg_help="Path to root folder to work in.",
                       setting_file_location=True)
-    hidden_unit_count = Argument(default=128, arg_type=int, action='store',
+    hidden_unit_count = Argument(default=64, arg_type=int, action='store',
                                  arg_help="Embedding layer size and LSTM number of hidden units.")
     patience = Argument(default=15, arg_type=int,
                         arg_help="Number of epochs to wait before early stop if there is no training progress.")
@@ -54,7 +54,7 @@ class Arguments(Enum):
     reload_model = Argument(default=False, arg_type='bool_flag',
                             arg_help="Whether or not to reload the existing model from the model file location.")
     # TODO why is this the number of categories(squared), not just number of categories???
-    category_count = Argument(default=25, arg_type=int,
+    category_count = Argument(default=5, arg_type=int,
                               arg_help="Number of categories (squared)")
     weighted = Argument(default=False, arg_type='bool_flag',
                         arg_help="Whether or not to weigh update cost using the inverse combined sequence" +

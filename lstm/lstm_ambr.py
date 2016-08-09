@@ -171,11 +171,11 @@ def param_init_lstm(options, params, prefix='lstm'):
     return params
 
 
-def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
-               init_h=None, init_c=None):
-    nsteps = state_below.shape[0]
-    if state_below.ndim == 3:
-        n_samples = state_below.shape[1]
+def generate_lstm_layer(tparams, embedding_layer, options, prefix='lstm', mask=None,
+                        init_h=None, init_c=None):
+    n_frames_in_sample = embedding_layer.shape[0]
+    if embedding_layer.ndim == 3:
+        n_samples = embedding_layer.shape[1]
     else:
         n_samples = 1
 
@@ -190,24 +190,21 @@ def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
         preact = tensor.dot(h_, tparams[_p(prefix, 'U')])
         preact += x_
 
-        i = tensor.nnet.sigmoid(_slice(preact, 0, options["hidden_unit_count"]))
-        f = tensor.nnet.sigmoid(_slice(preact, 1, options["hidden_unit_count"]))
-        o = tensor.nnet.sigmoid(_slice(preact, 2, options["hidden_unit_count"]))
-        c = tensor.tanh(_slice(preact, 3, options["hidden_unit_count"]))
-        # c = tensor.maximum(_slice(preact, 3, options["hidden_unit_count"]), 0.0)
+        input = tensor.nnet.sigmoid(_slice(preact, 0, options["hidden_unit_count"]))
+        forget = tensor.nnet.sigmoid(_slice(preact, 1, options["hidden_unit_count"]))
+        output = tensor.nnet.sigmoid(_slice(preact, 2, options["hidden_unit_count"]))
+        cell = tensor.tanh(_slice(preact, 3, options["hidden_unit_count"]))
 
-        c = f * c_ + i * c
-        # c = (f * c_ + i * c) * 0.5
-        c = m_[:, None] * c + (1. - m_)[:, None] * c_
+        cell = forget * c_ + input * cell
+        cell = m_[:, None] * cell + (1. - m_)[:, None] * c_
 
-        h = o * tensor.tanh(c)
-        # h = o * tensor.maximum(c, 0.0)
-        h = m_[:, None] * h + (1. - m_)[:, None] * h_
+        hidden = output * tensor.tanh(cell)
+        hidden = m_[:, None] * hidden + (1. - m_)[:, None] * h_
 
-        return h, c, i, f, o
+        return hidden, cell, input, forget, output
 
-    state_below = (tensor.dot(state_below, tparams[_p(prefix, 'W')]) +
-                   tparams[_p(prefix, 'b')])
+    embedding_layer = (tensor.dot(embedding_layer, tparams[_p(prefix, 'W')]) +
+                       tparams[_p(prefix, 'b')])
 
     dim_proj = options["hidden_unit_count"]
 
@@ -219,17 +216,17 @@ def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
         init_o = tensor.alloc(numpy_floatX(0.), n_samples, dim_proj)
 
     rval, updates = theano.scan(_step,
-                                sequences=[mask, state_below],
+                                sequences=[mask, embedding_layer],
                                 outputs_info=[init_h, init_c, init_i, init_f, init_o],
                                 name=_p(prefix, '_layers'),
-                                n_steps=nsteps)
+                                n_steps=n_frames_in_sample)
 
     return rval
 
 
 # ff: Feed Forward (normal neural net), only useful to put after lstm
 #     before the classifier.
-layers = {'lstm': (param_init_lstm, lstm_layer)}
+layers = {'lstm': (param_init_lstm, generate_lstm_layer)}
 
 
 def build_model(tparams, options):
@@ -246,9 +243,9 @@ def build_model(tparams, options):
     n_samples = x.shape[1]
 
     emb = theano.dot(x, tparams['Wemb'])
-    rval = get_layer(options['encoder'])[1](tparams, emb, options,
-                                            prefix=options['encoder'],
-                                            mask=mask)
+    rval = generate_lstm_layer(tparams, emb, options,
+                               prefix=options['encoder'],
+                               mask=mask)
 
     proj_all_raw, c, i, f, o = rval
 
@@ -377,7 +374,9 @@ def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, category_count, ver
     for _, valid_index in iterator:
         x, mask, y = prepare_data([data[0][t] for t in valid_index],
                                   np.array(data[1])[valid_index])
+        print(x.shape, mask.shape, y.shape)
         pred_probs = f_pred_prob(x, mask)
+        print(pred_probs.shape)
         probabilities[valid_index, :] = pred_probs
         gts[valid_index] = np.array(data[1])[valid_index]
 
