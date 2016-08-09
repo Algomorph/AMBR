@@ -1,26 +1,31 @@
 #!/usr/bin/python3
-'''
+"""
 Build a tweet sentiment analyzer
-'''
+"""
+# stdlib
 from collections import OrderedDict
 import pickle as pkl
 import os
 import sys
 import time
 
+# scipy stack
 import numpy as np
 import scipy.io as sio
 
+# theano
 import theano
 from theano import config
 import theano.tensor as tensor
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
-# from util import *
-import lstm.data_ambr as data
-
-import pylab
+# charts
+from matplotlib import pyplot as pylab
 import matplotlib as mpl
+
+# local
+from lstm.data_ambr import load_data, prepare_data
+from lstm.arguments import get_default_options
 
 mpl.rcParams['image.interpolation'] = 'nearest'
 
@@ -108,8 +113,8 @@ def init_params(options):
                                               prefix=options['encoder'])
     # classifier
     params['U'] = 0.01 * np.random.randn(options["hidden_unit_count"],
-                                         options['ydim']).astype(config.floatX)
-    params['b'] = np.zeros((options['ydim'],)).astype(config.floatX)
+                                         options['category_count']).astype(config.floatX)
+    params['b'] = np.zeros((options['category_count'],)).astype(config.floatX)
 
     return params
 
@@ -253,67 +258,6 @@ def sgd(lr, tparams, grads, x, mask, y, cost):
     return f_grad_shared, f_update
 
 
-def adadelta(lr, tparams, grads, x, mask, y, cost):
-    """
-    An adaptive learning rate optimizer
-
-    Parameters
-    ----------
-    lr : Theano SharedVariable
-        Initial learning rate
-    tpramas: Theano SharedVariable
-        Model parameters
-    grads: Theano variable
-        Gradients of cost w.r.t to parameres
-    x: Theano variable
-        Model inputs
-    mask: Theano variable
-        Sequence mask
-    y: Theano variable
-        Targets
-    cost: Theano variable
-        Objective fucntion to minimize
-
-    Notes
-    -----
-    For more information, see [ADADELTA]_.
-
-    .. [ADADELTA] Matthew D. Zeiler, *ADADELTA: An Adaptive Learning
-       Rate Method*, arXiv:1212.5701.
-    """
-
-    zipped_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                  name='%s_grad' % k)
-                    for k, p in tparams.items()]
-    running_up2 = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                 name='%s_rup2' % k)
-                   for k, p in tparams.items()]
-    running_grads2 = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                    name='%s_rgrad2' % k)
-                      for k, p in tparams.items()]
-
-    zgup = [(zg, g) for zg, g in zip(zipped_grads, grads)]
-    rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
-             for rg2, g in zip(running_grads2, grads)]
-
-    f_grad_shared = theano.function([x, mask, y], cost, updates=zgup + rg2up,
-                                    name='adadelta_f_grad_shared')
-
-    updir = [-tensor.sqrt(ru2 + 1e-6) / tensor.sqrt(rg2 + 1e-6) * zg
-             for zg, ru2, rg2 in zip(zipped_grads,
-                                     running_up2,
-                                     running_grads2)]
-    ru2up = [(ru2, 0.95 * ru2 + 0.05 * (ud ** 2))
-             for ru2, ud in zip(running_up2, updir)]
-    param_up = [(p, p + ud) for p, ud in zip(list(tparams.values()), updir)]
-
-    f_update = theano.function([lr], [], updates=ru2up + param_up,
-                               on_unused_input='ignore',
-                               name='adadelta_f_update')
-
-    return f_grad_shared, f_update
-
-
 def rmsprop(lr, tparams, grads, x, mask, y, cost):
     """
     A variant of  SGD that scales the step size by running average of the
@@ -377,11 +321,6 @@ def rmsprop(lr, tparams, grads, x, mask, y, cost):
                                name='rmsprop_f_update')
 
     return f_grad_shared, f_update
-
-
-def get_datasets():
-    # data.test_subect_list = [test_subject]
-    return (data.load_data, data.prepare_data)
 
 
 def build_model(tparams, options):
@@ -572,50 +511,36 @@ def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, category_count, ver
     return probabilities, gts, prec, rec
 
 
-def test_lstm(
-        test_subject,
-        model_file,  # the file to save the model
-        options,
-        metadata,
-        result_dir=None
-):
-    load_data, prepare_data = get_datasets()
-
-    options['model_file'] = model_file
+def test_lstm(model_file_path, options, result_dir=None):
+    options['model_file'] = model_file_path
     print("model options", options)
     print('Loading test data')
-    train, valid, test = load_data([test_subject])
+    train, valid, test = load_data()
 
     print("%d train examples" % len(train[0]))
     print("%d valid examples" % len(valid[0]))
     print("%d test examples" % len(test[0]))
 
     if not result_dir:
-        # result_dir = 'test_results_%s' % (metadata['suffix'])
-        # result_dir = 'test_results2_%s' % (metadata['suffix'])
-        # result_dir = 'test_results3_%s' % (metadata['suffix'])
-        # result_dir = 'test_results4_%s' % (metadata['suffix'])
-        # result_dir = 'test_results5_%s' % (metadata['suffix'])
-        # result_dir = 'test_results6_%s' % (metadata['suffix'])
-        # result_dir = 'test_results7_%s' % (metadata['suffix'])
-        result_dir = 'test_results8_%s' % (metadata['suffix'])
-        result_dir = 'test_results9_%s' % (metadata['suffix'])
+        result_dir = 'test_results9'
+
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
-    options['valid_batch_size'] = 1
+    options['validation_batch_size'] = 1
     params = init_params(options)
-    load_params(model_file, params)
+    load_params(model_file_path, params)
     tparams = init_tparams(params)
     (use_noise, x, mask,
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_model(tparams, options)
 
-    kf_test = get_minibatches_idx(len(test[0]), options['valid_batch_size'])
+    kf_test = get_minibatches_idx(len(test[0]), options['validation_batch_size'])
     print("%d test examples" % len(test[0]))
 
-    probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, prepare_data, test, kf_test, options['ydim'], verbose=False)
+    probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, prepare_data, test, kf_test, options['category_count'],
+                                          verbose=False)
     preds_all = np.argmax(probs, axis=1)
-    cm = confusion_matrix(gts, preds_all, nCls=options['ydim'])
+    cm = confusion_matrix(gts, preds_all, category_count=options['category_count'])
     cm = np.asarray(cm, 'float32')
     cm = cm / np.sum(cm, axis=0)
     cm[np.where(np.isnan(cm))] = 0
@@ -624,7 +549,7 @@ def test_lstm(
     ax = f.add_axes([0.1, 0.1, 0.8, 0.8])
     im = ax.imshow(cm, interpolation='nearest')
     f.colorbar(im)
-    pylab.savefig("%s/confusion_matrix_sub_%s.png" % (result_dir, test_subject))
+    pylab.savefig("%s/confusion_matrix_sub.png" % result_dir)
 
     # import pdb; pdb.set_trace()
 
@@ -632,7 +557,7 @@ def test_lstm(
                'gts': gts,
                'prec': prec,
                'rec': rec}
-    result_file = '%s/%s_result.mat' % (result_dir, model_file.split('/')[-1].split('.')[0])
+    result_file = '%s/%s_result.mat' % (result_dir, model_file_path.split('/')[-1].split('.')[0])
     sio.savemat(result_file, results)
 
     preds_all = []
@@ -646,31 +571,20 @@ def test_lstm(
                    'end_frame': [d['e_fid'] for d in test[2]],
                    'label': [d['label'] for d in test[2]]}
 
-    results_all_file = '%s/%s_result_all.mat' % (result_dir, model_file.split('/')[-1].split('.')[0])
+    results_all_file = '%s/%s_result_all.mat' % (result_dir, model_file_path.split('/')[-1].split('.')[0])
     sio.savemat(results_all_file, results_all)
     return
 
 
-def train_lstm(
-        test_subject,
-        model_file,  # the file to save the model
-        options,
-        metadata,
-        result_dir=None,
-):
-    options['model_file'] = model_file
+def train_lstm(model_output_path, options, check_gradients=False):
+    options['model_file'] = model_output_path
     print("model options", options)
-    saveto = model_file
     save_interval = options['save_interval']
     validation_interval = options['validation_interval']
     optimizer = options['optimizer']
 
-    load_data, prepare_data = get_datasets()
-
-    test_subject_list = [test_subject]
-
     print('Loading data')
-    train, valid, test = load_data(test_subject_list)
+    train, valid, test = load_data()
     print("%d train examples" % len(train[0]))
     print("%d valid examples" % len(valid[0]))
     print("%d test examples" % len(test[0]))
@@ -681,7 +595,7 @@ def train_lstm(
     params = init_params(options)
 
     if options['reload_model']:
-        load_params(model_file, params)
+        load_params(model_output_path, params)
 
     # This create Theano Shared Variable from the parameters.
     # Dict name (string) -> Theano Tensor Shared Variable
@@ -710,8 +624,8 @@ def train_lstm(
 
     print('Optimization')
 
-    kf_valid = get_minibatches_idx(len(valid[0]), options['valid_batch_size'])
-    kf_test = get_minibatches_idx(len(test[0]), options['valid_batch_size'])
+    kf_valid = get_minibatches_idx(len(valid[0]), options['validation_batch_size'])
+    kf_test = get_minibatches_idx(len(test[0]), options['validation_batch_size'])
 
     history_errs = []
     eidx_a = []
@@ -748,12 +662,12 @@ def train_lstm(
                 n_samples += x.shape[1]
 
                 # # Check gradients
-                # grads = f_grad(x, mask, y)
-                # grads_value = grad_array(grads)
-                # # import pdb; pdb.set_trace()
-                # print 'gradients :', [np.mean(g) for g in grads_value]
-                # params = unzip(tparams)
-                # print 'parameter :', [np.mean(vv) for kk, vv in params.iteritems()]
+                if check_gradients:
+                    grads = f_grad(x, mask, y)
+                    grads_value = grad_array(grads)
+                    print('gradients :', [np.mean(g) for g in grads_value])
+                    params = unzip(tparams)
+                    print('parameter :', [np.mean(vv) for kk, vv in params.iteritems()])
 
                 cost = f_grad_shared(x, mask, y)
                 f_update(options['learning_rate'])
@@ -765,15 +679,15 @@ def train_lstm(
                 if np.mod(uidx, options['display_interval']) == 0:
                     print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
 
-                if saveto and np.mod(uidx, save_interval) == 0:
+                if model_output_path and np.mod(uidx, save_interval) == 0:
                     print('Saving...', end=' ')
 
                     if best_p is not None:
                         params = best_p
                     else:
                         params = unzip(tparams)
-                    np.savez(saveto, history_errs=history_errs, **params)
-                    pkl.dump(options, open('%s.pkl' % saveto, 'wb'), -1)
+                    np.savez(model_output_path, history_errs=history_errs, **params)
+                    pkl.dump(options, open('%s.pkl' % model_output_path, 'wb'), -1)
                     print('Done')
 
                 if np.mod(uidx, options['validation_interval']) == 0:
@@ -792,7 +706,7 @@ def train_lstm(
                     pylab.clf()
                     lines = pylab.plot(np.array(eidx_a), np.array(history_errs))
                     pylab.legend(lines, ['train', 'valid', 'test'])
-                    pylab.savefig("err_%s.png" % (metadata['suffix']))
+                    pylab.savefig("err.png")
                     time.sleep(0.1)
 
                     if (uidx == 0 or
@@ -835,8 +749,8 @@ def train_lstm(
     test_err = pred_error(f_pred, prepare_data, test, kf_test)
 
     print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err))
-    if saveto:
-        np.savez(saveto, train_err=train_err,
+    if model_output_path:
+        np.savez(model_output_path, train_err=train_err,
                  valid_err=valid_err, test_err=test_err,
                  history_errs=history_errs, **best_p)
     print('The code run for %d epochs, with %f sec/epochs' % (
@@ -846,15 +760,15 @@ def train_lstm(
     return train_err, valid_err, test_err
 
 
-def confusion_matrix(gt, pred, nCls):
-    cm = np.zeros((nCls, nCls))
-    for i in range(nCls):
-        idxCls = np.where(gt == i)[0]
-        if idxCls.size == 0:
+def confusion_matrix(gt, pred, category_count):
+    cm = np.zeros((category_count, category_count))
+    for i in range(category_count):
+        idx_category = np.where(gt == i)[0]
+        if idx_category.size == 0:
             continue
-        predCls = pred[idxCls]
-        for j in range(nCls):
-            cm[j, i] = np.where(predCls == j)[0].shape[0]
+        predicted_category = pred[idx_category]
+        for j in range(category_count):
+            cm[j, i] = np.where(predicted_category == j)[0].shape[0]
 
     return cm
 
@@ -873,71 +787,24 @@ def test_confusion_matrix():
     return cm
 
 
-def get_default_options(category_count):
-    hidden_unit_count = 128  # word embeding dimension and LSTM number of hidden units.
-    patience = 15  # Number of epoch to wait before early stop if no progress
-    max_epochs = 300  # The maximum number of epoch to run
-    display_interval = 50  # Display to stdout the training progress every N updates
-    decay_c = 0.  # Weight decay for the classifier applied to the U weights.
-    learning_rate = 0.0001  # Learning rate for sgd (not used for adadelta and rmsprop)
-    feature_count = 4096  # CNN feature dimension
-    # feature_count = 8192
-    optimizer = adadelta  # sgd, adadelta and rmsprop available, sgd very hard to use, not recommanded (probably need momentum and decaying learning rate).
-    encoder = 'lstm'  # TODO: can be removed must be lstm.
-    validation_interval = 20  # Compute the validation error after this number of update.
-    save_interval = 50  # Save the parameters after every save_interval updates
-    batch_size = 10  # The batch size during training.
-    valid_batch_size = 5  # The batch size used for validation/test set.
-
-    # Parameter for extra option
-    noise_std = 0.
-    use_dropout = True  # if False slightly faster, but worst test error
-    # This frequently need a bigger model.
-    reload_model = None  # Path to a saved model we want to start from.
-    ydim = category_count  # number of class
-
-    options = locals().copy()
-    return options
-
-
 def main():
-    hidden_unit_count = 64
-    feature_count = 4096
     model_dir = 'action_model9'  # 5 objs
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    category_count = 5 * 5
-    options = get_default_options(category_count)
-    options["hidden_unit_count"] = hidden_unit_count
-    options['feature_count'] = feature_count
+    options = get_default_options()
 
-    metadata = {
-        'exp_name': 'default',
-        'suffix': 'default'
-    }
+    model_file = '%s/lstm_model.npz' % model_dir
 
-    subject_list = ['and', 'fer', 'gui', 'kos', 'mic']
+    if not os.path.isfile(model_file):
+        train_lstm(model_file, options)
 
-    # training
-    for test_subject in subject_list:
-
-        metadata['suffix'] = '%s_%s' % (metadata['exp_name'], test_subject)
-
-        model_file = '%s/lstm_%s_model.npz' % (model_dir, metadata['suffix'])
-
-        if not os.path.isfile(model_file):
-            train_lstm(test_subject, model_file, options, metadata)
-
-            # testing
-            # for test_subject in subject_list:
-        test_lstm(test_subject, model_file, options, metadata)
+        # testing
+        # for test_subject in subject_list:
+    test_lstm(model_file, options)
     return 0
 
 
 if __name__ == '__main__':
     pylab.ion()
     sys.exit(main())
-
-# stdbuf -oL python lstm_exp2.py  2>&1 | tee log/train_exp_run2_ts`date +%s`.log
-# stdbuf -oL python lstm_exp2.py  2>&1 | tee log/train_exp_run8_obj5_ts`date +%s`.log

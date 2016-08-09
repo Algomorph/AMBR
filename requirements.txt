@@ -1,1 +1,5 @@
+yaml
+pylab
+matplotlib
 theano
+pyyaml

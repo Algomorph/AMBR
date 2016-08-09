@@ -1,4 +1,3 @@
-#!/usr/bin/python2
 '''
 Build a tweet sentiment analyzer
 '''
@@ -17,7 +16,7 @@ import theano.tensor as tensor
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 # from util import *
-import lstm.data_ambr as data
+import data_ambr as data
 
 import pylab
 import matplotlib as mpl

@@ -52,7 +52,7 @@ def prepare_data(batch_x, batch_y, maxlen=maxlen):
     return x, x_mask, batch_y
 
 
-def load_data(test_subject_list):
+def load_data():
     """Loads the dataset
 
     :type path: String
