@@ -374,9 +374,7 @@ def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, category_count, ver
     for _, valid_index in iterator:
         x, mask, y = prepare_data([data[0][t] for t in valid_index],
                                   np.array(data[1])[valid_index])
-        print(x.shape, mask.shape, y.shape)
         pred_probs = f_pred_prob(x, mask)
-        print(pred_probs.shape)
         probabilities[valid_index, :] = pred_probs
         gts[valid_index] = np.array(data[1])[valid_index]
 

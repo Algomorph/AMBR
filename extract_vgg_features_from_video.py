@@ -24,6 +24,7 @@ class VideoVGGFeatureExtractor(BaseVideoBackgroundSubtractor):
         BackgroundSubtractor.prep_parser(parser)
         parser.add_argument("-cpu", "--caffe_cpu", action="store_true", help="Use Caffe in CPU mode.", default=False)
         parser.add_argument("-od", "--output_datafile", default=None)
+
         return parser
 
     def __init__(self, args):
@@ -36,6 +37,8 @@ class VideoVGGFeatureExtractor(BaseVideoBackgroundSubtractor):
         else:
             caffe.set_mode_gpu()
         self.extractor = VGGFeatureExtractor()
+        self.blank_features = self.extractor.extract_single(np.zeros((256, 256, 3), dtype=np.uint8), blobs=['fc7'])[
+            'fc7']
         self.features = []
 
     def save_results(self):
@@ -59,7 +62,7 @@ class VideoVGGFeatureExtractor(BaseVideoBackgroundSubtractor):
             features = self.extractor.extract_single(input_image, blobs=['fc7'])['fc7']
         else:
             self.prev_frame_centroid = None
-            features = np.zeros((self.extractor.blobs['fc7'].channels,), dtype=np.float32)
+            features = self.blank_features.copy()
         self.features.append(features)
 
 
