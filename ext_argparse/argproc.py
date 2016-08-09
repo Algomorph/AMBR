@@ -16,6 +16,7 @@
 from ext_argparse.argument import Argument
 import argparse as ap
 import os.path
+import re
 from yaml import load, dump
 
 try:
@@ -50,7 +51,7 @@ class ArgumentProcessor(object):
     def __generate_setting_file_location_arg_collection(self):
         sfl_arg_collection = set()
         for item in self.arg_enum:
-            if item.setting_file_location:
+            if item.value.setting_file_location:
                 sfl_arg_collection.add(item.name)
         return sfl_arg_collection
 
@@ -103,15 +104,17 @@ class ArgumentProcessor(object):
                     parser.add_argument(item.value.shorthand, '--' + item.name, action=item.value.action,
                                         type=item.value.type, nargs=item.value.nargs, required=item.value.required,
                                         default=defaults[item.name], help=item.value.help)
-        # add non-enum args
-        item = ArgumentProcessor.settings_file
-        parser.add_argument(ArgumentProcessor.settings_file_shorthand, '--' + ArgumentProcessor.settings_file_name,
-                            action=item.value.action, type=item.value.type, nargs=item.value.nargs,
-                            required=item.value.required, default=defaults[item.name], help=item.value.help)
-        item = ArgumentProcessor.save_settings
-        parser.add_argument(ArgumentProcessor.save_settings_shorthand, '--' + ArgumentProcessor.save_settings_name,
-                            action=item.value.action, default=defaults[item.name], required=item.value.required,
-                            help=item.value.help)
+        if console_only:
+            # add non-enum args
+            value = ArgumentProcessor.settings_file
+            parser.add_argument(ArgumentProcessor.settings_file_shorthand, '--' + ArgumentProcessor.settings_file_name,
+                                action=value.action, type=value.type, nargs=value.nargs,
+                                required=value.required, default=defaults[ArgumentProcessor.settings_file_name],
+                                help=value.help)
+            value = ArgumentProcessor.save_settings
+            parser.add_argument(ArgumentProcessor.save_settings_shorthand, '--' + ArgumentProcessor.save_settings_name,
+                                action=value.action, default=defaults[ArgumentProcessor.save_settings_name],
+                                required=value.required, help=value.help)
 
         if not console_only:
             parser.set_defaults(**defaults)

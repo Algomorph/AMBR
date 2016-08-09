@@ -24,8 +24,10 @@ from matplotlib import pyplot as pylab
 import matplotlib as mpl
 
 # local
+from lstm.optimizer import adadelta, sgd, rmsprop
 from lstm.data_ambr import load_data, prepare_data
-from lstm.arguments import get_default_options
+from lstm.arguments import Arguments
+from ext_argparse.argproc import process_arguments
 
 mpl.rcParams['image.interpolation'] = 'nearest'
 
@@ -230,99 +232,6 @@ def lstm_layer(tparams, state_below, options, prefix='lstm', mask=None,
 layers = {'lstm': (param_init_lstm, lstm_layer)}
 
 
-def sgd(lr, tparams, grads, x, mask, y, cost):
-    """ Stochastic Gradient Descent
-
-    :note: A more complicated version of sgd then needed.  This is
-        done like that for adadelta and rmsprop.
-
-    """
-    # New set of shared variable that will contain the gradient
-    # for a mini-batch.
-    gshared = [theano.shared(p.get_value() * 0., name='%s_grad' % k)
-               for k, p in tparams.items()]
-    gsup = [(gs, g) for gs, g in zip(gshared, grads)]
-
-    # Function that computes gradients for a mini-batch, but do not
-    # updates the weights.
-    f_grad_shared = theano.function([x, mask, y], cost, updates=gsup,
-                                    name='sgd_f_grad_shared')
-
-    pup = [(p, p - lr * g) for p, g in zip(list(tparams.values()), gshared)]
-
-    # Function that updates the weights from the previously computed
-    # gradient.
-    f_update = theano.function([lr], [], updates=pup,
-                               name='sgd_f_update')
-
-    return f_grad_shared, f_update
-
-
-def rmsprop(lr, tparams, grads, x, mask, y, cost):
-    """
-    A variant of  SGD that scales the step size by running average of the
-    recent step norms.
-
-    Parameters
-    ----------
-    lr : Theano SharedVariable
-        Initial learning rate
-    tpramas: Theano SharedVariable
-        Model parameters
-    grads: Theano variable
-        Gradients of cost w.r.t to parameres
-    x: Theano variable
-        Model inputs
-    mask: Theano variable
-        Sequence mask
-    y: Theano variable
-        Targets
-    cost: Theano variable
-        Objective fucntion to minimize
-
-    Notes
-    -----
-    For more information, see [Hint2014]_.
-
-    .. [Hint2014] Geoff Hinton, *Neural Networks for Machine Learning*,
-       lecture 6a,
-       http://cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf
-    """
-
-    zipped_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                  name='%s_grad' % k)
-                    for k, p in tparams.items()]
-    running_grads = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                   name='%s_rgrad' % k)
-                     for k, p in tparams.items()]
-    running_grads2 = [theano.shared(p.get_value() * numpy_floatX(0.),
-                                    name='%s_rgrad2' % k)
-                      for k, p in tparams.items()]
-
-    zgup = [(zg, g) for zg, g in zip(zipped_grads, grads)]
-    rgup = [(rg, 0.95 * rg + 0.05 * g) for rg, g in zip(running_grads, grads)]
-    rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
-             for rg2, g in zip(running_grads2, grads)]
-
-    f_grad_shared = theano.function([x, mask, y], cost,
-                                    updates=zgup + rgup + rg2up,
-                                    name='rmsprop_f_grad_shared')
-
-    updir = [theano.shared(p.get_value() * numpy_floatX(0.),
-                           name='%s_updir' % k)
-             for k, p in tparams.items()]
-    updir_new = [(ud, 0.9 * ud - 1e-4 * zg / tensor.sqrt(rg2 - rg ** 2 + 1e-4))
-                 for ud, zg, rg, rg2 in zip(updir, zipped_grads, running_grads,
-                                            running_grads2)]
-    param_up = [(p, p + udn[1])
-                for p, udn in zip(list(tparams.values()), updir_new)]
-    f_update = theano.function([lr], [], updates=updir_new + param_up,
-                               on_unused_input='ignore',
-                               name='rmsprop_f_update')
-
-    return f_grad_shared, f_update
-
-
 def build_model(tparams, options):
     trng = RandomStreams(SEED)
 
@@ -335,16 +244,6 @@ def build_model(tparams, options):
 
     n_timesteps = x.shape[0]
     n_samples = x.shape[1]
-
-    #    emb = tparams['Wemb'][x.flatten()].reshape([n_timesteps,
-    #                                                n_samples,
-    #                                                options["hidden_unit_count"]])
-
-    #    randn = np.random.rand(options['feature_count'],
-    #                              options["hidden_unit_count"])
-    #    fixed_wemb = (0.01 * randn).astype(config.floatX)
-    #    fixed_wemb_shared = theano.shared(fixed_wemb, "fixed_wemb")
-    #    emb = theano.dot(x, fixed_wemb_shared)
 
     emb = theano.dot(x, tparams['Wemb'])
     rval = get_layer(options['encoder'])[1](tparams, emb, options,
@@ -376,14 +275,7 @@ def build_model(tparams, options):
     pred_all, updates = theano.scan(onestep_softmax,
                                     sequences=[out_proj_all],
                                     non_sequences=None,
-                                    n_steps=n_timesteps
-                                    )
-
-    # min_val = out_proj_all.min(axis=2)
-    # max_val = out_proj_all.max(axis=2)
-    # out_proj_all = (out_proj_all + min_val[:,:,None])/(max_val-min_val)[:,:,None]
-
-    # pred_all = out_proj_all / out_proj_all.sum(axis=2)[:,:,None]
+                                    n_steps=n_timesteps)
 
     f_pred_prob_all = theano.function([x, mask], pred_all, name='f_pred_prob_all')
 
@@ -576,12 +468,23 @@ def test_lstm(model_file_path, options, result_dir=None):
     return
 
 
+def get_optimizer_constructor(name):
+    if name == 'adadelta':
+        return adadelta
+    elif name == 'sgd':
+        return sgd
+    elif name == 'rmsprop':
+        return rmsprop
+    else:
+        raise ValueError("Optimizer {:s} not supported")
+
+
 def train_lstm(model_output_path, options, check_gradients=False):
     options['model_file'] = model_output_path
     print("model options", options)
     save_interval = options['save_interval']
     validation_interval = options['validation_interval']
-    optimizer = options['optimizer']
+    optimizer = get_optimizer_constructor(options['optimizer'])
 
     print('Loading data')
     train, valid, test = load_data()
@@ -788,20 +691,19 @@ def test_confusion_matrix():
 
 
 def main():
-    model_dir = 'action_model9'  # 5 objs
+    model_dir = 'action_model9'
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    options = get_default_options()
+    args = process_arguments(Arguments, "Train & test an LSTM model on the given input.")
 
     model_file = '%s/lstm_model.npz' % model_dir
 
     if not os.path.isfile(model_file):
-        train_lstm(model_file, options)
+        train_lstm(model_file, args.__dict__)
 
-        # testing
-        # for test_subject in subject_list:
-    test_lstm(model_file, options)
+    # testing
+    test_lstm(model_file, args.__dict__)
     return 0
 
 

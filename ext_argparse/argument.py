@@ -61,6 +61,7 @@ class Argument(object):
                                     " settings file is provided, will be set to the location of the settings file.")
         else:
             self.help = arg_help
+        self.setting_file_location = setting_file_location
 
         if shorthand is None:
             self.shorthand = None

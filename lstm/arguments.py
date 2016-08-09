@@ -13,11 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ================================================================
-
-from lstm.optimizer import adadelta
 from enum import Enum
 from ext_argparse.argument import Argument
-from ext_argparse.argproc import process_arguments
 
 
 class Arguments(Enum):
@@ -56,33 +53,9 @@ class Arguments(Enum):
                                                                          "but the model yields a worse test error.")
     reload_model = Argument(default=False, arg_type='bool_flag',
                             arg_help="Whether or not to reload the existing model from the model file location.")
-    category_count = Argument(default=5, arg_type=int,
-                             arg_help="Number of categories")
-
-
-
-def get_default_options():
-    hidden_unit_count = 64  # word embeding dimension and LSTM number of hidden units.
-    patience = 15  # Number of epoch to wait before early stop if no progress
-    max_epochs = 300  # The maximum number of epoch to run
-    display_interval = 50  # Display to stdout the training progress every N updates
-    decay_c = 0.  # Weight decay for the classifier applied to the U weights.
-    learning_rate = 0.0001  # Learning rate for sgd (not used for adadelta and rmsprop)
-    feature_count = 4096  # input feature count
-    optimizer = adadelta  # sgd, adadelta and rmsprop available, sgd very hard to use, not recommanded (probably need momentum and decaying learning rate).
-    encoder = 'lstm'  # TODO: can be removed, must be lstm.
-    validation_interval = 20  # Compute the validation error after this number of update.
-    save_interval = 50  # Save the parameters after every save_interval updates
-    batch_size = 10  # The batch size during training.
-    validation_batch_size = 5  # The batch size used for validation/test set.
-
-    # Parameter for extra option
-    noise_std = 0.
-    use_dropout = True  # if False slightly faster, but worst test error
-    # This frequently need a bigger model.
-    reload_model = None  # Path to a saved model we want to start from.
-    category_count = 25
-    weighted = False  # whether or not to weigh error using the inverse combined sequence length ratio of each category to the total size of the training input.
-
-    options = locals().copy()
-    return options
+    # TODO why is this the number of categories(squared), not just number of categories???
+    category_count = Argument(default=25, arg_type=int,
+                              arg_help="Number of categories (squared)")
+    weighted = Argument(default=False, arg_type='bool_flag',
+                        arg_help="Whether or not to weigh update cost using the inverse combined sequence" +
+                                 "count ratio of each category to the total sample count.")
