@@ -1,9 +1,8 @@
 import os
 import json
 
-import numpy
+import numpy as np
 import theano
-
 
 object_list = ['al0'];
 maxlen = None
@@ -41,10 +40,10 @@ def prepare_data(batch_x, batch_y, maxlen=maxlen):
             return None, None, None
 
     n_samples = len(batch_x)
-    maxlen = numpy.max(lengths)
+    maxlen = np.max(lengths)
 
-    x = numpy.zeros((maxlen, n_samples, feat_dim)).astype(theano.config.floatX)
-    x_mask = numpy.zeros((maxlen, n_samples)).astype(theano.config.floatX)
+    x = np.zeros((maxlen, n_samples, feat_dim)).astype(theano.config.floatX)
+    x_mask = np.zeros((maxlen, n_samples)).astype(theano.config.floatX)
     for idx, s in enumerate(batch_x):
         x[:lengths[idx], idx, :] = s
         x_mask[:lengths[idx], idx] = 1.
@@ -87,30 +86,33 @@ def load_data():
         # load the image features into memory
         features_path = os.path.join(base_data_path, "{:s}.npy".format(obj))
         print('loading features: %s' % (features_path,))
-        all_features = numpy.load(features_path)
+        all_features = np.load(features_path)
 
         for sample_data in dataset:
             sample_features = all_features[sample_data['s_fid']:sample_data['e_fid'] + 1, :]
 
             feat_count += all_features.shape[0]
-            feat_mean += numpy.sum(numpy.mean(all_features, axis=1))
+            feat_mean += np.sum(np.mean(all_features, axis=1))
 
-            sample_label = sample_data['label'] - 1
+            sample_label = sample_data['label']
 
             features_by_sample.append(sample_features)
-            labels_by_sample.append(sample_label + max_y)
+            labels_by_sample.append(sample_label)
             meta_by_sample.append(sample_data)
 
-        y = [d['label'] for d in dataset]
-        max_y += max(y)
+    features_by_sample = np.array(features_by_sample)
+    labels_by_sample = np.array(labels_by_sample)
+
+    unique_labels = np.unique(labels_by_sample)
+    n_categories = len(unique_labels)
 
     # split features into test, training, and validation set
     n_samples = len(features_by_sample)
-    sidx = numpy.random.permutation(n_samples)
-    test_ratio = 0.3
-    train_ratio = 0.4
-    test_count = int(numpy.round(n_samples * test_ratio))
-    train_count = int(numpy.round(n_samples * train_ratio))
+    sidx = np.random.permutation(n_samples)
+    test_ratio = 0.2
+    train_ratio = 0.6
+    test_count = int(np.round(n_samples * test_ratio))
+    train_count = int(np.round(n_samples * train_ratio))
     start_train = test_count
     end_train = test_count + train_count
     start_valid = end_train
@@ -118,6 +120,12 @@ def load_data():
     test_set_x = [features_by_sample[s] for s in sidx[0:test_count]]
     test_set_y = [labels_by_sample[s] for s in sidx[0:test_count]]
     test_set_meta = [meta_by_sample[s] for s in sidx[0:test_count]]
+    # compute weights
+    sample_counts_per_label = np.zeros(len(n_categories), np.int32)
+    for label in test_set_y:
+        sample_counts_per_label[label] += 1
+    weights_by_label = n_samples / (sample_counts_per_label * len(n_categories))
+    train_set_weights = [weights_by_label[y] for y in test_set_y]
 
     train_set_x = [features_by_sample[s] for s in sidx[start_train:end_train]]
     train_set_y = [labels_by_sample[s] for s in sidx[start_train:end_train]]
@@ -127,8 +135,8 @@ def load_data():
     validation_set_y = [labels_by_sample[s] for s in sidx[start_valid:]]
     validation_set_meta = [meta_by_sample[s] for s in sidx[start_valid:]]
 
-    train = (train_set_x, train_set_y, train_set_meta)
+    train = (train_set_x, train_set_y, train_set_meta, train_set_weights)
     valid = (validation_set_x, validation_set_y, validation_set_meta)
     test = (test_set_x, test_set_y, test_set_meta)
 
-    return train, valid, test
+    return train, valid, test, n_categories

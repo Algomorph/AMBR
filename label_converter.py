@@ -25,25 +25,9 @@ def jsonwrite(file, s_fid, e_fid, label):
     file.write('\n')
 
 
-def read_csv(filename):
-    with open(filename) as csvfile:
-        readCSV = csv.reader(csvfile, delimiter=',')
-        s_fid = []
-        e_fid = []
-        l_fid = []
-        for row in readCSV:
-            s = int(row[0])
-            e = int(row[1])
-            l = int(row[2])
-
-            s_fid.append(s)
-            e_fid.append(e)
-            l_fid.append(l)
-        return s_fid, e_fid, l_fid
-
-
 # writer = csv.writer(open("label.csv", "w"), delimiter=',', lineterminator='\n')
 def main():
+    #TODO: make input & output options
     lines = tuple(open("al0_labels.txt", 'r'))
     parse_re = re.compile(r"(\d+)\s*-(\d+):\s*(R|G|S|\[out of frame\])\s*?(\?)\s*?")
     label_mapping = {
@@ -72,6 +56,8 @@ def main():
             sample = sample_data[ix_sample]
             next_sample = sample_data[ix_sample+1]
             jsonwrite(sample[0], sample[1], sample[2])
+            #TODO: make this an option
+            #TODO: add checking for consecutive intervals
             jsonwrite(sample[1] + 1, next_sample[0] - 1, default_behavior_label)
     return 0
 

@@ -59,3 +59,5 @@ class Arguments(Enum):
     weighted = Argument(default=False, arg_type='bool_flag',
                         arg_help="Whether or not to weigh update cost using the inverse combined sequence" +
                                  "count ratio of each category to the total sample count.")
+    overwrite_model = Argument(default=False, arg_type='bool_flag',
+                               arg_help="Whether or not to overwrite the model at the model file location.")
