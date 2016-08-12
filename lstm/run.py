@@ -262,6 +262,8 @@ def test_lstm(model_output_path, args, result_dir=None):
 
 
 def train_lstm(model_output_path, args, check_gradients=False):
+    random_seed = 2016
+    np.random.seed(random_seed)
     args.model_file = model_output_path
     print("model options", args)
     save_interval = args.save_interval
@@ -289,7 +291,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
     # use_noise is for dropout
     (use_noise, x, mask, w,
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model, use_dropout=args.use_dropout,
-                                                                                   weighted_cost=args.weighted)
+                                                                                   weighted_cost=args.weighted,
+                                                                                   random_seed=random_seed)
 
     # TODO: figure out what is this weight decay, simply L2 regularization? Then decay_c is regularization constant?
     if args.decay_c > 0.:
@@ -369,7 +372,6 @@ def train_lstm(model_output_path, args, check_gradients=False):
                         raise ValueError("Inf dectected in cost. Cost: {:s}".format(str(cost)))
                     else:
                         raise ValueError("NaN dectected in cost. Cost: {:s}".format(str(cost)))
-                    return 1., 1., 1.
 
                 if uidx % args.display_interval == 0:
                     print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
@@ -428,9 +430,9 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     end_time = time.time()
     if best_p is not None:
-        zipp(best_p, model)
+        zipp(best_p, model.parameter_dict)
     else:
-        best_p = unzip(model)
+        best_p = unzip(model.parameter_dict)
 
     use_noise.set_value(0.)
     kf_train_sorted = get_minibatches_idx(len(train[0]), args.batch_size)

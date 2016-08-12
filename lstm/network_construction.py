@@ -125,8 +125,9 @@ def build_dropout_layer(input_projection, noise_bool_flag, random_seed):
     :param random_seed: random seed to use for introducing noise in the hidden units
     :return: theano tensor for projection after introduction of dropout
     """
+    rng = RandomStreams(random_seed)
     output_projection = tensor.switch(noise_bool_flag, (input_projection *
-                                                        RandomStreams(random_seed).binomial(
+                                                        rng.binomial(
                                                             input_projection.shape, p=0.5, n=1,
                                                             dtype=input_projection.dtype)),
                                       input_projection * 0.5)
