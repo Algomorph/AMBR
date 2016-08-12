@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import os.path
 import caffe
-from enum import Enum
 
 
 class VideoVGGFeatureExtractor(BaseVideoBackgroundSubtractor):

@@ -2,6 +2,7 @@ import os
 import json
 
 import numpy as np
+from numpy import inf
 import theano
 
 object_list = ['al0'];
@@ -51,7 +52,7 @@ def prepare_data(batch_x, batch_y, maxlen=maxlen):
     return x, x_mask, batch_y
 
 
-def load_data():
+def load_data(datasets, base_work_folder):
     """Loads the dataset
 
     :type path: String
@@ -61,12 +62,6 @@ def load_data():
         the validation set.
     """
 
-    #############
-    # LOAD DATA #
-    #############
-
-    max_y = 0
-
     features_by_sample = []
     labels_by_sample = []
     meta_by_sample = []
@@ -74,9 +69,9 @@ def load_data():
     feat_count = 0
     feat_mean = 0
 
-    for obj in object_list:
-        base_data_path = os.path.join('/media/algomorph/Data/AMBR_data/train', 'data', 'al')
-        dataset_path = os.path.join(base_data_path, '{:s}_wo5_labels.json'.format(obj))
+    for obj in datasets:
+        base_data_path = os.path.join(base_work_folder, 'data')
+        dataset_path = os.path.join(base_data_path, '{:s}_labels.json'.format(obj))
         print('loading data: %s' % (dataset_path,))
         with open(dataset_path, 'r') as f:
             dataset = json.load(f)
@@ -84,12 +79,13 @@ def load_data():
         print('  dataset length: ', len(dataset))
 
         # load the image features into memory
-        features_path = os.path.join(base_data_path, "{:s}.npy".format(obj))
+        features_path = os.path.join(base_data_path, "{:s}_vgg.npz".format(obj))
         print('loading features: %s' % (features_path,))
-        all_features = np.load(features_path)
+        archive = np.load(features_path)
+        all_features = archive[archive.files[0]]
 
         for sample_data in dataset:
-            sample_features = all_features[sample_data['s_fid']:sample_data['e_fid'] + 1, :]
+            sample_features = all_features[sample_data['start']:sample_data['end'] + 1, :]
 
             feat_count += all_features.shape[0]
             feat_mean += np.sum(np.mean(all_features, axis=1))
@@ -117,26 +113,29 @@ def load_data():
     end_train = test_count + train_count
     start_valid = end_train
 
-    test_set_x = [features_by_sample[s] for s in sidx[0:test_count]]
-    test_set_y = [labels_by_sample[s] for s in sidx[0:test_count]]
-    test_set_meta = [meta_by_sample[s] for s in sidx[0:test_count]]
-    # compute weights
-    sample_counts_per_label = np.zeros(len(n_categories), np.int32)
-    for label in test_set_y:
-        sample_counts_per_label[label] += 1
-    weights_by_label = n_samples / (sample_counts_per_label * len(n_categories))
-    train_set_weights = [weights_by_label[y] for y in test_set_y]
-
     train_set_x = [features_by_sample[s] for s in sidx[start_train:end_train]]
     train_set_y = [labels_by_sample[s] for s in sidx[start_train:end_train]]
     train_set_meta = [meta_by_sample[s] for s in sidx[start_train:end_train]]
+
+    # compute weights
+    sample_counts_per_label = np.zeros(n_categories, np.int32)
+    for label in train_set_y:
+        sample_counts_per_label[label] += 1
+
+    weights_by_label = len(train_set_x) / (np.count_nonzero(sample_counts_per_label) * sample_counts_per_label)
+    weights_by_label[weights_by_label == inf] = 0
+    train_set_weights = [weights_by_label[y] for y in train_set_y]
+
+    test_set_x = [features_by_sample[s] for s in sidx[0:test_count]]
+    test_set_y = [labels_by_sample[s] for s in sidx[0:test_count]]
+    test_set_meta = [meta_by_sample[s] for s in sidx[0:test_count]]
 
     validation_set_x = [features_by_sample[s] for s in sidx[start_valid:]]
     validation_set_y = [labels_by_sample[s] for s in sidx[start_valid:]]
     validation_set_meta = [meta_by_sample[s] for s in sidx[start_valid:]]
 
-    train = (train_set_x, train_set_y, train_set_meta, train_set_weights)
-    valid = (validation_set_x, validation_set_y, validation_set_meta)
-    test = (test_set_x, test_set_y, test_set_meta)
+    train_set = (train_set_x, train_set_y, train_set_meta, train_set_weights)
+    validation_set = (validation_set_x, validation_set_y, validation_set_meta)
+    test_set = (test_set_x, test_set_y, test_set_meta)
 
-    return train, valid, test, n_categories
+    return train_set, validation_set, test_set, n_categories
