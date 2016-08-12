@@ -32,32 +32,34 @@ def generate_random_orthogonal_vectors(size):
     return u.astype(config.floatX)
 
 
-class Model(object):
+class Parameters(object):
     class Globals(object):
-        embedded_weights_literal = "embedding_layer_weights"
+        embedding_weights_literal = "embedding_layer_weights"
         classifier_weights_literal = "classifier_weights"
         classifier_bias_literal = "classifier_bias"
 
         def __init__(self, feature_count=None, hidden_unit_count=None, category_count=None, archive=None):
             if archive is None and (feature_count is None or hidden_unit_count is None or category_count is None):
                 raise ValueError(
-                    "If archive is not passed in, an " + Model.Globals.__name__ +
+                    "If archive is not passed in, an " + Parameters.Globals.__name__ +
                     " object needs all other constructor arguments to be integers.")
             if archive is None:
-                self.embedding_weights = \
-                    (0.01 * np.random.rand(feature_count, hidden_unit_count)).astype(config.floatX)  # formerly Wemb
-                self.classifier_weights = \
-                    0.01 * np.random.randn(hidden_unit_count, category_count).astype(config.floatX)  # formerly U
-                self.classifier_bias = np.zeros((category_count,)).astype(config.floatX)  # formerly b
+                self.embedding_weights = theano.shared(
+                    (0.01 * np.random.rand(feature_count, hidden_unit_count)).astype(config.floatX),  # formerly Wemb
+                    self.embedding_weights_literal)
+                self.classifier_weights = theano.shared(
+                    0.01 * np.random.randn(hidden_unit_count, category_count).astype(config.floatX),
+                    self.classifier_weights_literal)  # formerly U
+                self.classifier_bias = theano.shared(np.zeros((category_count,)).astype(config.floatX),
+                                                     self.classifier_bias_literal)  # formerly b
             else:
-                self.embedding_weights = archive[self.embedded_weights_literal]
-                self.classifier_weights = archive[self.classifier_weights_literal]
-                self.classifier_bias = archive[self.classifier_bias_literal]
+                self.load_values_from_archive(archive)
 
-        def write_to_dict(self, archive_dict):
-            archive_dict[self.embedded_weights_literal] = self.embedding_weights
-            archive_dict[self.classifier_weights_literal] = self.classifier_weights
-            archive_dict[self.classifier_bias_literal] = self.classifier_bias
+        def load_values_from_archive(self,archive):
+            self.embedding_weights = theano.shared(archive[self.embedding_weights_literal],
+                                                   self.embedding_weights_literal)
+            self.classifier_weights = archive[self.classifier_weights_literal]
+            self.classifier_bias = archive[self.classifier_bias_literal]
 
     class LSTM(object):
         input_weights_literal = "lstm_input_weights"
@@ -67,7 +69,7 @@ class Model(object):
         def __init__(self, hidden_unit_count=None, archive=None):
             if archive is None and hidden_unit_count is None:
                 raise ValueError(
-                    "If archive is not passed in, an " + Model.LSTM.__name__ +
+                    "If archive is not passed in, an " + Parameters.LSTM.__name__ +
                     " object needs hidden_unit_count argument to be an integer.")
             if archive is None:
                 gen__r_o_v = generate_random_orthogonal_vectors
@@ -80,31 +82,26 @@ class Model(object):
                                                       gen__r_o_v(hidden_unit_count),
                                                       gen__r_o_v(hidden_unit_count)], axis=1)  # formerly lstm_U
 
-                self.bias = np.zeros((4 * hidden_unit_count,)).astype(config.floatX)  # formerly lstm_b
+                self.lstm_bias = np.zeros((4 * hidden_unit_count,)).astype(config.floatX)  # formerly lstm_b
             else:
                 self.input_weights = archive[self.input_weights_literal]
                 self.hidden_weights = archive[self.hidden_weights_literal]
-                self.bias = archive[self.bias_literal]
-
-        def write_to_dict(self, archive_dict):
-            archive_dict[self.input_weights_literal] = self.input_weights
-            archive_dict[self.hidden_weights_literal] = self.hidden_weights
-            archive_dict[self.bias_literal] = self.bias
+                self.lstm_bias = archive[self.bias_literal]
 
     def __init__(self, feature_count=None, hidden_unit_count=None, category_count=None, archive=None):
         if archive is None and (feature_count is None or hidden_unit_count is None or category_count is None):
             raise ValueError(
-                "If archive is not passed in, an " + Model.__name__ +
+                "If archive is not passed in, an " + Parameters.__name__ +
                 " object needs all other constructor arguments to be integers.")
         if archive is None:
             self.feature_count = feature_count
             self.hidden_unit_count = hidden_unit_count
             self.category_count = category_count
-            self.globals = Model.Globals(feature_count, hidden_unit_count, category_count)
-            self.lstm = Model.LSTM(hidden_unit_count)
+            self.globals = Parameters.Globals(feature_count, hidden_unit_count, category_count)
+            self.lstm = Parameters.LSTM(hidden_unit_count)
         else:
-            self.globals = Model.Globals(archive=archive)
-            self.lstm = Model.Globals(archive=archive)
+            self.globals = Parameters.Globals(archive=archive)
+            self.lstm = Parameters.Globals(archive=archive)
             # infer basic settings from globals
             self.hidden_unit_count = self.globals.classifier_bias.shape[0]
             self.feature_count = self.globals.embedding_weights.shape[0]
@@ -134,7 +131,7 @@ def convert_to_theano(input_dict, output_dict):
         output_dict[key] = theano.shared(value, name=key)
 
 
-class TheanoModel(object):
+class TheanoParameters(object):
     """
     A Theano representation of LSTM parameters
     """
@@ -142,11 +139,11 @@ class TheanoModel(object):
     class Globals(object):
         def __init__(self, globals_):
             """
-            :type globals_: Model.Globals
+            :type globals_: Parameters.Globals
             :param globals_: non-theano global parameters (using numpy arrays)
             """
             self.embedding_weights = theano.shared(globals_.embedding_weights,
-                                                   globals_.embedded_weights_literal)
+                                                   globals_.embedding_weights_literal)
             self.classifier_weights = theano.shared(globals_.classifier_weights,
                                                     globals_.classifier_weights_literal)
             self.classifier_bias = theano.shared(globals_.classifier_bias, globals_.classifier_bias_literal)
@@ -154,23 +151,23 @@ class TheanoModel(object):
     class LSTM(object):
         def __init__(self, lstm_inputs):
             """
-            :type lstm_inputs: Model.LSTM
+            :type lstm_inputs: Parameters.LSTM
             :param lstm_inputs: non-theano LSTM input layer (using numpy arrays)
             """
             self.input_weights = theano.shared(lstm_inputs.input_weights, lstm_inputs.input_weights_literal)
             self.hidden_weights = theano.shared(lstm_inputs.hidden_weights, lstm_inputs.hidden_weights_literal)
-            self.bias = theano.shared(lstm_inputs.bias, lstm_inputs.input_weights_literal)
+            self.bias = theano.shared(lstm_inputs.lstm_bias, lstm_inputs.input_weights_literal)
 
-    def __init__(self, model):
+    def __init__(self, parameters):
         """
-        :type model: Model
-        :param model: source LSTM parameters (using numpy arrays)
+        :type parameters: Parameters
+        :param parameters: source LSTM parameters (using numpy arrays)
         """
-        self.feature_count = model.feature_count
-        self.hidden_unit_count = model.hidden_unit_count
-        self.category_count = model.category_count
-        self.globals = TheanoModel.Globals(model.globals)
-        self.lstm = TheanoModel.LSTM(model.lstm)
+        self.feature_count = parameters.feature_count
+        self.hidden_unit_count = parameters.hidden_unit_count
+        self.category_count = parameters.category_count
+        self.globals = TheanoParameters.Globals(parameters.globals)
+        self.lstm = TheanoParameters.LSTM(parameters.lstm)
         self.parameter_dict = {}
         self.parameter_dict.update(self.globals.__dict__)
         self.parameter_dict.update(self.lstm.__dict__)
@@ -180,4 +177,3 @@ class TheanoModel(object):
 
     def items(self):
         return self.parameter_dict.items()
-

@@ -22,7 +22,7 @@ from theano import config, tensor
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 # local
-from lstm.model import TheanoModel
+from lstm.params import TheanoParameters
 
 
 def numpy_float_x(data):
@@ -32,7 +32,7 @@ def numpy_float_x(data):
 def build_lstm_layer(model, lstm_input, masks=None):
     """
     :param lstm_input: input batch
-    :type model: TheanoModel
+    :type model: TheanoParameters
     :param model: embedding & lstm input layers
     :param masks: masks that cancel out the effect of the "empty" tail of each sequence (due to samples being of different lengths)
     :return:
@@ -126,7 +126,7 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
     :param weighted_cost: whether to weigh the output costs
     :param random_seed: random seed to use for dropout noise
     :see build_dropout_layer
-    :type model: TheanoModel
+    :type model: TheanoParameters
     :param model: parameters of the LSTM network
     :param use_dropout: whether or not to use dropout
     :return: all network inputs and tensor functions

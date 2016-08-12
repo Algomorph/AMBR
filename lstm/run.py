@@ -28,7 +28,7 @@ from matplotlib import pyplot as plt
 # local
 from lstm.optimizer import get_optimizer_constructor
 from lstm.arguments import Arguments
-from lstm.model import Model, TheanoModel
+from lstm.params import Parameters, TheanoParameters
 from lstm.network_construction import build_network
 from lstm.data_ambr import load_data, prepare_data
 from ext_argparse.argproc import process_arguments
@@ -74,23 +74,6 @@ def get_minibatches_idx(n, minibatch_size, shuffle=False):
 
     return list(zip(list(range(len(minibatches))), minibatches))
 
-
-def zipp(params, tparams):
-    """
-    When we reload the model. Needed for the GPU stuff.
-    """
-    for kk, vv in params.items():
-        tparams[kk].set_value(vv)
-
-
-def unzip(zipped):
-    """
-    When we pickle the model. Needed for the GPU stuff.
-    """
-    new_params = OrderedDict()
-    for kk, vv in zipped.items():
-        new_params[kk] = vv.get_value()
-    return new_params
 
 
 def grad_array(tgrad):
@@ -214,8 +197,8 @@ def test_lstm(model_output_path, args, result_dir=None):
         os.mkdir(result_dir)
 
     args.validation_batch_size = 1
-    non_theano_model = Model(archive=model_output_path)
-    model = TheanoModel(non_theano_model)
+    non_theano_model = Parameters(archive=model_output_path)
+    model = TheanoParameters(non_theano_model)
     (use_noise, x, mask, w, y, f_pred_prob,
      f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model,
                                                                    hidden_unit_count=args.hidden_unit_count)
@@ -279,12 +262,12 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     # This create the initial parameters as np ndarrays.
     if args.reload_model:
-        non_theano_model = Model(archive=model_output_path)
+        non_theano_model = Parameters(archive=model_output_path)
     else:
-        non_theano_model = Model(args.feature_count, args.hidden_unit_count, args.category_count)
+        non_theano_model = Parameters(args.feature_count, args.hidden_unit_count, args.category_count)
 
     # This will create Theano Shared Variables from the model parameters.
-    model = TheanoModel(non_theano_model)
+    model = TheanoParameters(non_theano_model)
 
     print('Building the network...')
     # use_noise is for dropout

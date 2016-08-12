@@ -33,10 +33,17 @@ def suppress_stdout():
 import numpy as np
 import theano
 from theano import config
-from theano import config
 import theano.tensor as tensor
 
 if __name__ == "__main__":
-    x = np.array([1., 2., 3.], config.floatX)
-    theano.shared(x)
+    x = np.array([1., 2., 3.] * 3, config.floatX)
+    y = np.array([3., 4., 5.], np.int64)
+    z = np.vstack((x, x.copy()))
+    x = theano.shared(x)
+    y = theano.shared(y)
+    z_in = tensor.tensor3('z', dtype=config.floatX)
+    x_in = tensor.matrix('x', dtype=config.floatX)
+    y_in = tensor.vector('y', dtype=np.int64.__name__)
+    x_dot_y = tensor.dot(x_in, y_in)
+    lr = tensor.scalar(name='lr')
     pass
