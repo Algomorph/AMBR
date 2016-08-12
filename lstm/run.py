@@ -11,31 +11,19 @@ import os
 import sys
 from contextlib import contextmanager
 
-
-@contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-
-
 # scipy stack
 import numpy as np
 import scipy.io as sio
 
 # theano
-with suppress_stdout():
-    import theano
-    from theano import config
-    import theano.tensor as tensor
+import theano
+from theano import config
+import theano.tensor as tensor
 
 # charts
-from matplotlib import pyplot as plt
 import matplotlib as mpl
+
+from matplotlib import pyplot as plt
 
 # local
 from lstm.optimizer import get_optimizer_constructor
@@ -48,7 +36,18 @@ from ext_argparse.argproc import process_arguments
 mpl.rcParams['image.interpolation'] = 'nearest'
 
 
-def numpy_floatX(data):
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+
+
+def to_numpy_theano_float(data):
     return np.asarray(data, dtype=config.floatX)
 
 
@@ -112,7 +111,7 @@ def compute_prediction_error(f_pred, data, iterator, show_hs=False, hs_func=None
         targets = np.array(data[1])[valid_index]
         valid_err += (preds == targets).sum()
 
-    valid_err = 1. - numpy_floatX(valid_err) / len(data[0])
+    valid_err = 1. - to_numpy_theano_float(valid_err) / len(data[0])
 
     if show_hs and not hs_func is None:
 
@@ -296,7 +295,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     # TODO: figure out what is this weight decay, simply L2 regularization? Then decay_c is regularization constant?
     if args.decay_c > 0.:
-        decay_c = theano.shared(numpy_floatX(args.decay_c), name='decay_c')
+        decay_c = theano.shared(to_numpy_theano_float(args.decay_c), name='decay_c')
         weight_decay = 0.
         weight_decay += (model.globals.classifier_weights ** 2).sum()
         weight_decay *= decay_c

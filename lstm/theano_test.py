@@ -33,6 +33,8 @@ def suppress_stdout():
 import numpy as np
 import theano
 from theano import config
+from theano import config
+import theano.tensor as tensor
 
 if __name__ == "__main__":
     x = np.array([1., 2., 3.], config.floatX)

@@ -13,30 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ================================================================
-from lstm.model import TheanoModel
+
 import numpy as np
 
-import sys
-import os
-from contextlib import contextmanager
+# theano
+import theano
+from theano import config, tensor
+from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
-
-@contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-
-
-with suppress_stdout():
-    # theano
-    import theano
-    from theano import config, tensor
-    from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+# local
+from lstm.model import TheanoModel
 
 
 def numpy_float_x(data):
