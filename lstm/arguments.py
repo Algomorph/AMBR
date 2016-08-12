@@ -52,7 +52,11 @@ class Arguments(Enum):
     # TODO: figure out how this works and write better help.
     use_dropout = Argument(default=False, arg_type='bool_flag', action='store_true',
                            arg_help="If False, training is slightly faster, " +
-                                    "but the model yields a worse test error.")
+                                    "but the model yields a worse test error. " +
+                                    "\nReference: Srivastava, Nitish, Geoffrey E. Hinton, Alex Krizhevsky, " +
+                                    "Ilya Sutskever, and Ruslan Salakhutdinov.\n    Dropout: a simple way to " +
+                                    "prevent neural networks from overfitting. Journal of Machine Learning " +
+                                    "Research 15, no. 1\n(2014): 1929-1958.")
     reload_model = Argument(default=False, arg_type='bool_flag', action='store_true',
                             arg_help="Whether or not to reload the existing model from the model file location.")
     # TODO why is this the number of categories(squared), not just number of categories???

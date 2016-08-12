@@ -10,6 +10,8 @@ import time
 import os
 import sys
 from contextlib import contextmanager
+
+
 @contextmanager
 def suppress_stdout():
     with open(os.devnull, "w") as devnull:
@@ -20,10 +22,10 @@ def suppress_stdout():
         finally:
             sys.stdout = old_stdout
 
+
 # scipy stack
 import numpy as np
 import scipy.io as sio
-
 
 # theano
 with suppress_stdout():
@@ -278,7 +280,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
     if args.reload_model:
         non_theano_model = Model(archive=model_output_path)
     else:
-        non_theano_model = Model(args.feature_count, args.category_count, args.hidden_unit_count)
+        non_theano_model = Model(args.feature_count, args.hidden_unit_count, args.category_count)
 
     # This will create Theano Shared Variables from the model parameters.
     model = TheanoModel(non_theano_model)
@@ -286,7 +288,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
     print('Building the network...')
     # use_noise is for dropout
     (use_noise, x, mask, w,
-     y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model, args)
+     y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model, use_dropout=args.use_dropout,
+                                                                                   weighted_cost=args.weighted)
 
     # TODO: figure out what is this weight decay, simply L2 regularization? Then decay_c is regularization constant?
     if args.decay_c > 0.:
@@ -362,7 +365,10 @@ def train_lstm(model_output_path, args, check_gradients=False):
                 f_update(args.learning_rate)
 
                 if np.isnan(cost) or np.isinf(cost):
-                    print('NaN/inf detected')
+                    if np.isinf(cost):
+                        raise ValueError("Inf dectected in cost. Cost: {:s}".format(str(cost)))
+                    else:
+                        raise ValueError("NaN dectected in cost. Cost: {:s}".format(str(cost)))
                     return 1., 1., 1.
 
                 if uidx % args.display_interval == 0:

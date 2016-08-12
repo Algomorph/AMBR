@@ -19,6 +19,8 @@ import numpy as np
 import sys
 import os
 from contextlib import contextmanager
+
+
 @contextmanager
 def suppress_stdout():
     with open(os.devnull, "w") as devnull:
@@ -28,6 +30,8 @@ def suppress_stdout():
             yield
         finally:
             sys.stdout = old_stdout
+
+
 with suppress_stdout():
     # theano
     import theano
@@ -175,8 +179,9 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
     sample_projection = timestep_projections_weighted.sum(axis=0)
     sample_projection = sample_projection / masks.sum(axis=0)[:, None]
 
+    # deal with dropout
+    noise_bool_flag = theano.shared(numpy_float_x(0.))
     if use_dropout:
-        noise_bool_flag = theano.shared(numpy_float_x(0.))
         sample_projection = build_dropout_layer(sample_projection, noise_bool_flag, random_seed)
 
     # formerly "pred"

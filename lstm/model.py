@@ -123,12 +123,18 @@ class Model(object):
             self.hidden_unit_count = self.globals.classifier_bias.shape[0]
             self.feature_count = self.globals.embedding_weights.shape[0]
             self.category_count = self.globals.classifier_weights.shape[1]
+        self.parameter_dict = {}
+        self.parameter_dict.update(self.globals.__dict__)
+        self.parameter_dict.update(self.lstm.__dict__)
 
     def save_to_archive(self, path):
         archive_dict = {}
         self.globals.write_to_dict(archive_dict)
         self.lstm.write_to_dict(archive_dict)
         np.savez(path, **archive_dict)
+
+    def items(self):
+        return self.parameter_dict.items()
 
 
 # Avoid this function, instead make everything explicit
