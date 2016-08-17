@@ -72,29 +72,31 @@ def load_data(datasets, base_work_folder):
     for obj in datasets:
         base_data_path = os.path.join(base_work_folder, 'data')
         dataset_path = os.path.join(base_data_path, '{:s}_labels.json'.format(obj))
-        print('loading data: %s' % (dataset_path,))
+        print('  loading labels from: %s' % (dataset_path,))
         with open(dataset_path, 'r') as f:
-            dataset = json.load(f)
+            label_entries = json.load(f)
 
-        print('  dataset length: ', len(dataset))
+        print('  dataset length: ', len(label_entries))
 
         # load the image features into memory
         features_path = os.path.join(base_data_path, "{:s}_vgg.npz".format(obj))
-        print('loading features: %s' % (features_path,))
+        print('  loading features from: %s' % (features_path,))
         archive = np.load(features_path)
         all_features = archive[archive.files[0]]
 
-        for sample_data in dataset:
-            sample_features = all_features[sample_data['start']:sample_data['end'] + 1, :]
+        for entry in label_entries:
+            sample_features = all_features[entry['beginning']:entry['end'] + 1, :]
+            if len(sample_features) == 0:
+                raise ValueError("Got input sequence length 0: {:s}".format(str(entry)))
 
             feat_count += all_features.shape[0]
             feat_mean += np.sum(np.mean(all_features, axis=1))
 
-            sample_label = sample_data['label']
+            sample_label = entry['label']
 
             features_by_sample.append(sample_features)
             labels_by_sample.append(sample_label)
-            meta_by_sample.append(sample_data)
+            meta_by_sample.append(entry)
 
     features_by_sample = np.array(features_by_sample)
     labels_by_sample = np.array(labels_by_sample)

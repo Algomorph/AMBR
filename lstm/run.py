@@ -28,7 +28,7 @@ from matplotlib import pyplot as plt
 # local
 from lstm.optimizer import get_optimizer_constructor
 from lstm.arguments import Arguments
-from lstm.params import Parameters, TheanoParameters
+from lstm.params import Parameters, Parameters
 from lstm.network_construction import build_network
 from lstm.data_ambr import load_data, prepare_data
 from ext_argparse.argproc import process_arguments
@@ -186,9 +186,9 @@ def test_lstm(model_output_path, args, result_dir=None):
     print('Loading test data')
     train, valid, test, n_categories = load_data(args.datasets, args.folder)
 
-    print("%d train examples" % len(train[0]))
-    print("%d valid examples" % len(valid[0]))
-    print("%d test examples" % len(test[0]))
+    print("%d training samples" % len(train[0]))
+    print("%d validation samples" % len(valid[0]))
+    print("%d test samples" % len(test[0]))
 
     if not result_dir:
         result_dir = 'test_results9'
@@ -197,8 +197,8 @@ def test_lstm(model_output_path, args, result_dir=None):
         os.mkdir(result_dir)
 
     args.validation_batch_size = 1
-    non_theano_model = Parameters(archive=model_output_path)
-    model = TheanoParameters(non_theano_model)
+    non_theano_model = Parameters(archive=np.load(model_output_path))
+    model = Parameters(non_theano_model)
     (use_noise, x, mask, w, y, f_pred_prob,
      f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model,
                                                                    hidden_unit_count=args.hidden_unit_count)
@@ -261,17 +261,15 @@ def train_lstm(model_output_path, args, check_gradients=False):
     print('Initializing the model...')
 
     # This create the initial parameters as np ndarrays.
-    if args.reload_model:
-        non_theano_model = Parameters(archive=model_output_path)
-    else:
-        non_theano_model = Parameters(args.feature_count, args.hidden_unit_count, args.category_count)
-
     # This will create Theano Shared Variables from the model parameters.
-    model = TheanoParameters(non_theano_model)
+    if args.reload_model:
+        model = Parameters(archive=model_output_path)
+    else:
+        model = Parameters(args.feature_count, args.hidden_unit_count, args.category_count)
 
     print('Building the network...')
     # use_noise is for dropout
-    (use_noise, x, mask, w,
+    (use_noise_flag, x, mask, w,
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model, use_dropout=args.use_dropout,
                                                                                    weighted_cost=args.weighted,
                                                                                    random_seed=random_seed)
@@ -303,7 +301,6 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     history_errs = []
     eidx_a = []
-    best_p = None
 
     if save_interval == -1:
         save_interval = len(train[0]) / args.batch_size
@@ -320,7 +317,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
             for _, train_index in kf:
                 uidx += 1
-                use_noise.set_value(1.)
+                use_noise_flag.set_value(1.)
 
                 # Select the random examples for this minibatch
                 y = [train[1][t] for t in train_index]
@@ -343,34 +340,27 @@ def train_lstm(model_output_path, args, check_gradients=False):
                     grads = f_grad(*inputs)
                     grads_value = grad_array(grads)
                     print('gradients :', [np.mean(g) for g in grads_value])
-                    non_theano_model = unzip(model)
-                    print('parameter :', [np.mean(vv) for kk, vv in non_theano_model.iteritems()])
+                    print('parameters :', [np.mean(vv) for kk, vv in model.as_dict().items()])
 
                 cost = f_grad_shared(*inputs)
                 f_update(args.learning_rate)
 
                 if np.isnan(cost) or np.isinf(cost):
                     if np.isinf(cost):
-                        raise ValueError("Inf dectected in cost. Cost: {:s}".format(str(cost)))
+                        raise ValueError("Inf dectected in cost. Aborting.")
                     else:
-                        raise ValueError("NaN dectected in cost. Cost: {:s}".format(str(cost)))
+                        raise ValueError("NaN dectected in cost. Aborting.")
 
                 if uidx % args.display_interval == 0:
                     print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
 
                 if model_output_path and uidx % save_interval == 0:
                     print('Saving...', end=' ')
-
-                    if best_p is not None:
-                        non_theano_model = best_p
-                    else:
-                        non_theano_model = unzip(model)
-                    np.savez(model_output_path, history_errs=history_errs, **non_theano_model)
-                    pkl.dump(args.__dict__, open('%s.pkl' % model_output_path, 'wb'), -1)
+                    model.save_to_numpy_archive(model_output_path)
                     print('Done')
 
                 if uidx % args.validation_interval == 0:
-                    use_noise.set_value(0.)
+                    use_noise_flag.set_value(0.)
                     train_err = compute_prediction_error(f_pred, train, kf)
                     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
                     test_err = compute_prediction_error(f_pred, test, kf_test)
@@ -386,8 +376,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
                     time.sleep(0.1)
 
                     if uidx == 0 or valid_err <= np.array(history_errs)[:, 1].min():
-
-                        best_p = unzip(model)
+                        best_parameters = model.as_dict()
                         bad_counter = 0
                         if valid_err < np.array(history_errs)[:, 1].min():
                             print('  New best validation results.')
@@ -408,15 +397,13 @@ def train_lstm(model_output_path, args, check_gradients=False):
                 break
 
     except KeyboardInterrupt:
-        print("Training interupted")
+        print("Training interrupted")
 
     end_time = time.time()
-    if best_p is not None:
-        zipp(best_p, model.parameter_dict)
-    else:
-        best_p = unzip(model.parameter_dict)
+    if best_parameters is None:
+        best_parameters = model.as_dict()
 
-    use_noise.set_value(0.)
+    use_noise_flag.set_value(0.)
     kf_train_sorted = get_minibatches_idx(len(train[0]), args.batch_size)
     train_err = compute_prediction_error(f_pred, train, kf_train_sorted)
     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
@@ -426,7 +413,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
     if model_output_path:
         np.savez(model_output_path, train_err=train_err,
                  valid_err=valid_err, test_err=test_err,
-                 history_errs=history_errs, **best_p)
+                 history_errs=history_errs, **best_parameters)
     print('The code run for %d epochs, with %f sec/epochs' % (
         (eidx + 1), (end_time - start_time) / (1. * (eidx + 1))))
     print(('Training took %.1fs' %

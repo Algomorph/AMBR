@@ -144,7 +144,7 @@ def adadelta(lr, model, grads, x, mask, y, cost, w=None):
     Rate Method*, arXiv:1212.5701.
     :type lr: theano.tensor.sharedvar.TensorSharedVariable
     :param lr: Initial learning rate
-    :type model: lstm.params.TheanoParameters
+    :type model: lstm.params.Parameters
     :param model: Model parameters
     :param grads:  Gradients of cost w.r.t to parameters
     :type x: theano.tensor.sharedvar.TensorSharedVariable

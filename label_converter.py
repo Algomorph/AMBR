@@ -19,11 +19,12 @@ parser.add_argument("-i", "--input_file", type=str, default="al_labels.txt")
 parser.add_argument("-o", "--output_file", type=str, default=None)
 parser.add_argument("-dl", "--default_label", default=False, action='store_true',
                     help="Whether to use default label or not.")
+parser.add_argument("-msl", "--min_sequence_length", type=int, default=10)
 
 
 def generate_sample_hash(s_fid, e_fid, label):
     data = {
-        'start': int(s_fid),
+        'beginning': int(s_fid),
         'end': int(e_fid),
         'label': int(label)
     }
@@ -74,13 +75,13 @@ def main():
     data_out = []
 
     if args.default_label and sample_data[0, 0] > 0:
-        data_out.append(generate_sample_hash(0, sample_data[0, 0] - 1, default_behavior_label))
+        data_out.append(generate_sample_hash(0, sample_data[0, 0], default_behavior_label))
     for ix_sample in range(len(sample_data) - 1):
         sample = sample_data[ix_sample]
         next_sample = sample_data[ix_sample + 1]
-        data_out.append(generate_sample_hash(sample[0], sample[1], sample[2]))
-        if args.default_label and sample[1] + 1 != next_sample[0]:
-            data_out.append(generate_sample_hash(sample[1] + 1, next_sample[0] - 1, default_behavior_label))
+        data_out.append(generate_sample_hash(sample[0], sample[1] + 1, sample[2]))
+        if args.default_label and next_sample[0] - (sample[1] + 1) > args.min_sequence_length:
+            data_out.append(generate_sample_hash(sample[1] + 1, next_sample[0], default_behavior_label))
     sample = sample_data[-1]
     data_out.append(generate_sample_hash(sample[0], sample[1], sample[2]))
     with open(args.output_file, 'a') as file:

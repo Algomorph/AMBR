@@ -53,13 +53,14 @@ class Parameters(object):
                 self.classifier_bias = theano.shared(np.zeros((category_count,)).astype(config.floatX),
                                                      self.classifier_bias_literal)  # formerly b
             else:
-                self.load_values_from_archive(archive)
+                self.read_values_from_dict(archive)
 
-        def load_values_from_archive(self,archive):
+        def read_values_from_dict(self, archive):
             self.embedding_weights = theano.shared(archive[self.embedding_weights_literal],
                                                    self.embedding_weights_literal)
-            self.classifier_weights = archive[self.classifier_weights_literal]
-            self.classifier_bias = archive[self.classifier_bias_literal]
+            self.classifier_weights = theano.shared(archive[self.classifier_weights_literal],
+                                                    self.classifier_weights_literal)
+            self.classifier_bias = theano.shared(archive[self.classifier_bias_literal], self.classifier_bias_literal)
 
     class LSTM(object):
         input_weights_literal = "lstm_input_weights"
@@ -73,20 +74,26 @@ class Parameters(object):
                     " object needs hidden_unit_count argument to be an integer.")
             if archive is None:
                 gen__r_o_v = generate_random_orthogonal_vectors
-                self.input_weights = np.concatenate([gen__r_o_v(hidden_unit_count),
-                                                     gen__r_o_v(hidden_unit_count),
-                                                     gen__r_o_v(hidden_unit_count),
-                                                     gen__r_o_v(hidden_unit_count)], axis=1)  # formerly lstm_W
-                self.hidden_weights = np.concatenate([gen__r_o_v(hidden_unit_count),
-                                                      gen__r_o_v(hidden_unit_count),
-                                                      gen__r_o_v(hidden_unit_count),
-                                                      gen__r_o_v(hidden_unit_count)], axis=1)  # formerly lstm_U
+                self.input_weights = theano.shared(np.concatenate([gen__r_o_v(hidden_unit_count),
+                                                                   gen__r_o_v(hidden_unit_count),
+                                                                   gen__r_o_v(hidden_unit_count),
+                                                                   gen__r_o_v(hidden_unit_count)], axis=1),
+                                                   self.input_weights_literal)  # formerly lstm_W
+                self.hidden_weights = theano.shared(np.concatenate([gen__r_o_v(hidden_unit_count),
+                                                                    gen__r_o_v(hidden_unit_count),
+                                                                    gen__r_o_v(hidden_unit_count),
+                                                                    gen__r_o_v(hidden_unit_count)], axis=1),
+                                                    self.hidden_weights_literal)  # formerly lstm_U
 
-                self.lstm_bias = np.zeros((4 * hidden_unit_count,)).astype(config.floatX)  # formerly lstm_b
+                self.bias = theano.shared(np.zeros((4 * hidden_unit_count,)).astype(config.floatX),
+                                          self.bias_literal)  # formerly lstm_b
             else:
-                self.input_weights = archive[self.input_weights_literal]
-                self.hidden_weights = archive[self.hidden_weights_literal]
-                self.lstm_bias = archive[self.bias_literal]
+                self.load_values_from_dict(archive)
+
+        def load_values_from_dict(self, archive):
+            self.input_weights = theano.shared(archive[self.input_weights_literal], self.input_weights_literal)
+            self.hidden_weights = theano.shared(archive[self.hidden_weights_literal], self.hidden_weights_literal)
+            self.bias = theano.shared(archive[self.bias_literal], self.bias_literal)
 
     def __init__(self, feature_count=None, hidden_unit_count=None, category_count=None, archive=None):
         if archive is None and (feature_count is None or hidden_unit_count is None or category_count is None):
@@ -107,73 +114,33 @@ class Parameters(object):
             self.feature_count = self.globals.embedding_weights.shape[0]
             self.category_count = self.globals.classifier_weights.shape[1]
         self.parameter_dict = {}
+        self.__update_dict()
+
+    def __update_dict(self):
         self.parameter_dict.update(self.globals.__dict__)
         self.parameter_dict.update(self.lstm.__dict__)
 
-    def save_to_archive(self, path):
+    def write_to_dict(self, archive_dict):
+        for key, value in self.parameter_dict.items():
+            archive_dict[key] = value.get_value()
+
+    def as_dict(self):
         archive_dict = {}
-        self.globals.write_to_dict(archive_dict)
-        self.lstm.write_to_dict(archive_dict)
+        self.write_to_dict(archive_dict)
+        return archive_dict
+
+    def read_from_dict(self, archive_dict):
+        self.globals.read_values_from_dict(archive_dict)
+        self.lstm.read_values_from_dict(archive_dict)
+        self.__update_dict()
+
+    def save_to_numpy_archive(self, path):
+        archive_dict = {}
+        self.write_to_dict(archive_dict)
         np.savez(path, **archive_dict)
 
     def items(self):
         return self.parameter_dict.items()
 
-
-# Avoid this function, instead make everything explicit
-def convert_to_theano(input_dict, output_dict):
-    """
-    :param output_dict: dictionary of theano shared (host/device) arrays
-    :type input_dict: dict
-    :param input_dict: dictionary of numpy arrays
-    """
-    for key, value in input_dict.items():
-        output_dict[key] = theano.shared(value, name=key)
-
-
-class TheanoParameters(object):
-    """
-    A Theano representation of LSTM parameters
-    """
-
-    class Globals(object):
-        def __init__(self, globals_):
-            """
-            :type globals_: Parameters.Globals
-            :param globals_: non-theano global parameters (using numpy arrays)
-            """
-            self.embedding_weights = theano.shared(globals_.embedding_weights,
-                                                   globals_.embedding_weights_literal)
-            self.classifier_weights = theano.shared(globals_.classifier_weights,
-                                                    globals_.classifier_weights_literal)
-            self.classifier_bias = theano.shared(globals_.classifier_bias, globals_.classifier_bias_literal)
-
-    class LSTM(object):
-        def __init__(self, lstm_inputs):
-            """
-            :type lstm_inputs: Parameters.LSTM
-            :param lstm_inputs: non-theano LSTM input layer (using numpy arrays)
-            """
-            self.input_weights = theano.shared(lstm_inputs.input_weights, lstm_inputs.input_weights_literal)
-            self.hidden_weights = theano.shared(lstm_inputs.hidden_weights, lstm_inputs.hidden_weights_literal)
-            self.bias = theano.shared(lstm_inputs.lstm_bias, lstm_inputs.input_weights_literal)
-
-    def __init__(self, parameters):
-        """
-        :type parameters: Parameters
-        :param parameters: source LSTM parameters (using numpy arrays)
-        """
-        self.feature_count = parameters.feature_count
-        self.hidden_unit_count = parameters.hidden_unit_count
-        self.category_count = parameters.category_count
-        self.globals = TheanoParameters.Globals(parameters.globals)
-        self.lstm = TheanoParameters.LSTM(parameters.lstm)
-        self.parameter_dict = {}
-        self.parameter_dict.update(self.globals.__dict__)
-        self.parameter_dict.update(self.lstm.__dict__)
-
     def values(self):
         return self.parameter_dict.values()
-
-    def items(self):
-        return self.parameter_dict.items()
