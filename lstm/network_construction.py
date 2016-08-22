@@ -216,7 +216,7 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
         off = 1e-6
 
     if weighted_cost:
-        cost_weights = tensor.vector('cost_weights', dtype=config.floatX)
+        cost_weights = tensor.vector('w', dtype=config.floatX)
         cost = -tensor.log(
             tensor.dot(sample_prediction[tensor.arange(n_samples_in_batch), y], cost_weights) + off).mean()
     else:

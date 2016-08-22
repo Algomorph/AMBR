@@ -1,4 +1,4 @@
-datapath: /media/<current_user>/Data/AMBR_data/cap/mouse_cap04
+datapath: /media/<current_user>/Data/AMBR_data/cap/mouse_cap04/videoset
 raw_options:
     al0_raw.mp4:
         global_offset: 38

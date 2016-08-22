@@ -126,6 +126,7 @@ def load_data(datasets, base_work_folder):
 
     weights_by_label = len(train_set_x) / (np.count_nonzero(sample_counts_per_label) * sample_counts_per_label)
     weights_by_label[weights_by_label == inf] = 0
+    print(weights_by_label)
     train_set_weights = [weights_by_label[y] for y in train_set_y]
 
     test_set_x = [features_by_sample[s] for s in sidx[0:test_count]]

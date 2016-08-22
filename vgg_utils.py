@@ -59,7 +59,7 @@ class VGGFeatureExtractor(caffe.Net):
     Calls caffe_io to convert video/images
     and extract embedding features
     """
-    default_vgg_model_path = "/media/" + getpass.getuser() + "/Data/AMBR_data/ml_models"
+    default_vgg_model_path = "/media/" + getpass.getuser() + "/Data/AMBR_data/ml"
     default_model_definition_file = "VGG_ILSVRC_16_layers_deploy.prototxt"
     default_pretrained_model_file = "VGG_ILSVRC_16_layers.caffemodel"
     jesu9_mean = [103.939, 116.779, 123.68]

@@ -61,6 +61,7 @@ class BaseVideoBackgroundSubtractor(VideoProcessor):
 
         self.reload_video()
 
+
 class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
     @staticmethod
     def make_parser(help_string):
@@ -102,6 +103,7 @@ class VideoBackgroundSubtractor(BaseVideoBackgroundSubtractor):
         self.foreground = self.extract_foreground()
         self.mask_writer.write(self.mask)
         self.foreground_writer.write(self.foreground)
+
 
 def main():
     help_string = "Subtract background from every frame in the video " + \
