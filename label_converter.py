@@ -17,6 +17,8 @@ from enum import Enum
 from ext_argparse.argproc import process_arguments
 from ext_argparse.argument import Argument
 
+from collections import OrderedDict
+
 
 class Arguments(Enum):
     folder = Argument(arg_help="Folder to work in.", setting_file_location=True, default=".")
@@ -33,7 +35,7 @@ class Arguments(Enum):
                               arg_type='bool_flag', default=False, action='store_true')
 
 
-class Fields():
+class Fields(object):
     beginning = "beginning"
     end = "end"
     label = "label"
@@ -48,14 +50,53 @@ def generate_sample_dict(beginning_frame, end_frame, label):
     return sample
 
 
-# writer = csv.writer(open("label.csv", "w"), delimiter=',', lineterminator='\n')
+def samples_match(samples, offsets, view_names, timestep_threshold):
+    source_found = False
+    ix_view = 0
+    samples_out = []
+    while not source_found and ix_view < len(view_names):
+        source_sample = samples[ix_view]
+        if source_sample is not None:
+            source_found = True
+        else:
+            samples_out.append(None)
+        ix_view += 1
+    if not source_found:
+        raise ValueError("Mouse not in any of the views?")
+
+    source_sample = samples[0]
+    source_beginning = source_sample[Fields.beginning] + offsets[0]
+    source_end = source_sample[Fields.end] + offsets[0]
+    source_label = source_sample[Fields.label]
+
+    for ix_view, target_sample in enumerate(samples[1:]):
+        if target_sample is None:
+            continue
+
+        target_beginning = target_sample[Fields.beginning] + offsets[ix_view]
+        target_end = target_sample[Fields.end] + offsets[ix_view]
+        target_label = target_sample[Fields.label]
+        if not (abs(source_beginning - target_beginning) < timestep_threshold):
+            raise ValueError(
+                "Mismatch between sample {:s}({:s}) and {:s}({:s}) beginning times.".format(str(source_sample),
+                                                                                            str(target_sample)))
+        if not (abs(source_end - target_end) < timestep_threshold):
+            raise ValueError(
+                "Mismatch between sample {:s}({:s}) and {:s}({:s}) end times.".format(str(source_sample)),
+                str(target_sample))
+        if source_label != target_label:
+            raise ValueError(
+                "Mismatch between sample {:s}({:s}) and {:s}({:s}) end times.".format(str(source_sample)))
+        offsets[ix_view] += int(round(((source_beginning-target_beginning)+(source_end-target_end))/2))
+
+
 def main():
     args = process_arguments(Arguments, "text label -> JSON Label Converter for LSTM")
     if args.multiview_only and args.single_view_only:
         raise ValueError("{s} and {s} arguments cannot be combined.".format(Arguments.single_view_only.name,
                                                                             Arguments.multiview_only.name))
     input_paths = []
-    base_names = []
+    view_names = []
 
     x_re = re.compile(r"\[\s*out of visual field\s*\]|\[\s*out of frame\s*\]")
     parse_re = re.compile(r"(\d+)\s*(?:\(\?\))?\s*-\s*(\d+)\s*(?:\(\?\))?(?::|;)?\s*(R|G|S|X)\s*?(\?)?\s*")
@@ -76,7 +117,7 @@ def main():
                     raise (IOError("Cound not find feature file at {:s}. Each label text file should have a " +
                                    "corresponding feature file.".format(feature_path)))
                 input_paths.append((file_path, feature_path))
-                base_names.append(base_name)
+                view_names.append(base_name)
     else:
         for file_name in args.input:
             file_path = os.path.join(args.folder, file_name)
@@ -93,15 +134,22 @@ def main():
                 raise (IOError("Cound not find feature file at {:s}. Each label text file should have a " +
                                "corresponding feature file.".format(feature_path)))
             input_paths.append((file_path, feature_path))
-            base_names.append(base_name)
+            view_names.append(base_name)
 
     multiview_samples = {}
+
+    frame_count = 0
 
     # process each input file one-by-one
     for input_index, (labels_path, feature_path) in enumerate(input_paths):
         input_file = args.input[input_index]
-        base_name = base_names[input_index]
+        base_name = view_names[input_index]
         present_flags = np.load(feature_path)
+
+        if frame_count > 0 and frame_count != len(present_flags):
+            raise ValueError("Frame counts don't match. Expecting: {:d}. " +
+                             "Got {:d} for data source {:s}".format(frame_count, len(present_flags), base_name))
+        frame_count = len(present_flags)
 
         if args.output_suffix:
             output_file = input_file[:-4] + args.output_suffix + ".json"
@@ -196,9 +244,34 @@ def main():
 
         multiview_samples[base_name] = samples
 
-    if not args.single_view_only:
-        # TODO
-        pass
+    if args.single_view_only:
+        return 0
+
+    offsets = []
+    for key in multiview_samples.keys():
+        multiview_samples[key] = {sample[Fields.beginning]: sample for sample in multiview_samples[key]}
+        offsets.append(0)
+
+    matched_samples = OrderedDict()
+    samples_per_matched_set = len(multiview_samples)
+    active_samples = [None] * samples_per_matched_set
+    samples_for_matching_count = 0
+
+    ix_frame = 0
+    while ix_frame < frame_count:
+        for ix_view, view in enumerate(view_names):
+            if active_samples[ix_view] is None and ix_frame in multiview_samples[view]:
+                if not multiview_samples[view][ix_frame][Fields.label] != label_mapping['X']:
+                    active_samples[ix_view] = multiview_samples[view][ix_frame]
+                samples_for_matching_count += 1
+
+        if samples_for_matching_count == samples_per_matched_set:
+            samples_match(samples)
+            active_samples = [None] * len(multiview_samples)
+            # ix_frame
+        else:
+            ix_frame += 1
+
     return 0
 
 
