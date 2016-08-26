@@ -62,106 +62,8 @@ def sample_len(sample):
         return sample[-1][Fields.end] - sample[0][Fields.start] + 1
     return sample[Fields.end] - sample[Fields.start] + 1
 
+def find_in_stream(sample,stream):
 
-def samples_match_check(samples, offsets, view_names, timestep_threshold):
-    ix_source_view = 0
-    source_view = None
-    source_sample = None
-    seek_offsets = [0] * len(view_names)
-
-    max_length = 0
-
-    # find longest sample to check against
-    for ix_view, sample in enumerate(samples):
-        sample_length = sample_len(sample)
-        if sample[Fields.label] != 0 and sample_length > max_length:
-            max_length = sample_length
-            source_sample = sample
-            source_view = view_names[ix_view]
-            ix_source_view = ix_view
-
-    if source_sample is None:
-        return False, ix_source_view, seek_offsets
-
-    source_beginning = source_sample[Fields.start] + offsets[ix_source_view]
-    source_end = source_sample[Fields.end] + offsets[ix_source_view]
-    source_offset = offsets[ix_source_view]
-    source_label = source_sample[Fields.label]
-
-    for ix_view, target_sample in enumerate(samples):
-        if ix_view != ix_source_view:
-            target_view = view_names[ix_view]
-            target_offset = offsets[ix_view]
-
-            if target_sample[Fields.label] == 0:
-                seek_offsets[ix_view] = target_sample[Fields.end] + 1
-                continue
-
-            target_beginning = target_sample[Fields.start] + offsets[ix_view]
-            target_end = target_sample[Fields.end] + offsets[ix_view]
-            target_label = target_sample[Fields.label]
-            if source_label != target_label:
-                raise ValueError("Mismatch between sample {:s}({:s}) and {:s}({:s}) labels."
-                                 .format(str(source_sample), source_view, str(target_sample), target_view))
-            if not (abs(source_beginning - target_beginning) < timestep_threshold):
-                raise ValueError("Mismatch between sample {:s}({:s} + {:d}) and {:s}({:s} + {:d}) start times."
-                                 .format(str(source_sample), source_view, source_offset, str(target_sample),
-                                         target_view, target_offset))
-
-            if not (abs(source_end - target_end) < timestep_threshold):
-                seek_offsets[ix_view] = target_sample[Fields.end] + 1
-                offsets[ix_view] += source_beginning - target_beginning // 1
-            else:
-                offsets[ix_view] += int(round(((source_beginning - target_beginning) + (source_end - target_end)) / 2))
-
-    return True, ix_source_view, seek_offsets
-
-
-def seek_within_samples(sample_streams, view_names, ix_source_view, active_samples, seek_offsets, offsets,
-                        timestep_threshold):
-    if np.sum(seek_offsets) == 0:
-        return active_samples
-    source_sample = active_samples[ix_source_view]
-    source_view = view_names[ix_source_view]
-    source_offset = offsets[ix_source_view]
-    source_label = source_sample[Fields.label]
-    for ix_view, stream in enumerate(sample_streams):
-        if seek_offsets[ix_view] == 0:
-            continue
-        target_samples = []
-        target_view = view_names[ix_view]
-        target_offset = offsets[ix_view]
-        current_label = active_samples[ix_view][Fields.label]
-        have_match = current_label == source_label
-        if have_match:
-            target_samples.append(active_samples[ix_view])
-        target_stream = sample_streams[ix_view]
-        for ix_frame in range(seek_offsets[ix_view], source_sample[Fields.end] + timestep_threshold):
-            if ix_frame in target_stream:
-                target_sample = target_stream[ix_frame]
-                if target_sample[Fields.label] == 0:
-                    ix_frame += target_sample[Fields.end] - target_sample[Fields.start] + 1
-                    continue
-                if target_sample[Fields.label] == source_label:
-                    have_match = True
-                    if target_sample[Fields.end] + target_offset > source_sample[
-                        Fields.end] + source_offset + timestep_threshold:
-                        raise ValueError("Mismatch between sample {:s}({:s} + {:d}) and {:s}({:s} + {:d}) end times."
-                                         .format(str(source_sample), source_view, source_offset, str(target_sample),
-                                                 target_view, target_offset))
-                    target_samples.append(target_sample)
-                else:
-                    if abs(source_sample[Fields.end] + source_offset - target_sample[
-                        Fields.start] + target_offset) > timestep_threshold:
-                        raise ValueError("Mismatch between sample {:s}({:s}) and {:s}({:s}) labels."
-                                         .format(str(source_sample), source_view, str(target_sample), target_view))
-        if have_match:
-            if len(target_samples) > 1:
-                active_samples[ix_view] = target_samples
-            else:
-                active_samples[ix_view] = target_samples[0]
-
-    return active_samples
 
 
 def clear_path_if_present(path):
@@ -429,46 +331,32 @@ def main():
 
     multiview_samples = [{sample[Fields.start]: sample for sample in multiview_sample_set} for multiview_sample_set in
                          multiview_samples]
+    matched_samples = {}
 
-    matched_samples = []
-    samples_per_matched_set = len(view_names)
-    offsets = [0] * samples_per_matched_set
-    active_samples = [None] * samples_per_matched_set
-    samples_for_matching_count = 0
+    for ix_source_view, source_view in enumerate(view_names):
+        source_samples = multiview_samples[ix_source_view]
+        source_to_delete = []
+        for source_start_time in source_samples.keys():
+            source_sample = source_sample[source_start_time]
+            matched_set = [None]*len(view_names)
+            matched_set[ix_source_view] = source_sample
+            for ix_target_view, target_view in enumerate(view_names):
+                if ix_target_view != ix_source_view:
+                    target_samples = multiview_samples[ix_target_view]
 
-    ix_frame = 0
-    print_multiview_headers(view_names)
-    end_at = sys.maxsize
-    while ix_frame < frame_count:
-        for ix_view, view in enumerate(view_names):
-            if active_samples[ix_view] is None and ix_frame in multiview_samples[ix_view]:
-                sample = multiview_samples[ix_view][ix_frame]
-                active_samples[ix_view] = sample
-                new_end_at = sample[Fields.end]
-                if new_end_at < end_at:
-                    end_at = new_end_at
-                samples_for_matching_count += 1
 
-        if samples_for_matching_count == samples_per_matched_set or ix_frame == end_at:
-            retval, ix_source_view, seek_offsets = samples_match_check(active_samples, offsets, view_names,
-                                                                       args.time_offset_threshold)
-            if retval:
-                active_samples = seek_within_samples(multiview_samples, view_names, ix_source_view,
-                                                     active_samples, seek_offsets, offsets, args.time_offset_threshold)
-                matched_samples.append(active_samples)
-            print_matched_set(active_samples)
-            advance_to = np.min([sample_end(sample) + 1 for sample in active_samples]) - args.time_offset_threshold
-            # reset matched set
-            active_samples = [None] * samples_per_matched_set
-            ix_frame = advance_to
-            samples_for_matching_count = 0
-            end_at = sys.maxsize
-        else:
-            ix_frame += 1
+
+        for source_start_time in source_to_delete:
+            del source_samples[source_start_time]
+
+    matched_sample_start_times = list(matched_samples.keys())
+    matched_sample_start_times.sort()
+    ordered_matched_samples = [matched_samples[start_time] for start_time in matched_sample_start_times]
+
 
     output_path = os.path.join(args.folder, "multiview_samples.json")
     file_handle = open(output_path, 'w')
-    json.dump(matched_samples, file_handle, indent=3)
+    json.dump(ordered_matched_samples, file_handle, indent=3)
     file_handle.close()
 
     return 0
