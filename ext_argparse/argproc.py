@@ -141,7 +141,8 @@ def process_arguments(program_arguments_enum, program_help_description):
                 for key, value in config_defaults.items():
                     defaults[key] = value
         else:
-            raise ValueError("Settings file not found at: {0:s}".format(args.settings_file))
+            if not args.save_settings:
+                raise ValueError("Settings file not found at: {0:s}".format(args.settings_file))
 
     parser = argproc.generate_parser(defaults, parents=[conf_parser])
     args = parser.parse_args(remaining_argv)
@@ -160,7 +161,7 @@ def process_arguments(program_arguments_enum, program_help_description):
         file_name = setting_dict[ArgumentProcessor.save_settings_name]
         del setting_dict[ArgumentProcessor.save_settings_name]
         del setting_dict[ArgumentProcessor.settings_file_name]
-        dump(setting_dict, file_stream, Dumper=Dumper)
+        dump(setting_dict, file_stream, Dumper=Dumper, indent=3, default_flow_style=False)
         file_stream.close()
         setting_dict[ArgumentProcessor.save_settings_name] = file_name
         setting_dict[ArgumentProcessor.settings_file_name] = True
