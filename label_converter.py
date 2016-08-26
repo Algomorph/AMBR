@@ -62,9 +62,6 @@ def sample_len(sample):
         return sample[-1][Fields.end] - sample[0][Fields.start] + 1
     return sample[Fields.end] - sample[Fields.start] + 1
 
-def find_in_stream(sample,stream):
-
-
 
 def clear_path_if_present(path):
     if os.path.exists(path):
@@ -74,106 +71,137 @@ def clear_path_if_present(path):
             shutil.rmtree(path)
 
 
-def label_at_time(sample, time):
-    if type(sample) != list:
-        return sample[Fields.label]
-    else:
-        ix = 0
-        while ix < len(sample) and sample[ix][Fields.end] > time:
-            ix += 1
-        return sample[ix - 1][Fields.label]
+def label_at_time(sample_list, time):
+    if len(sample_list) == 0:
+        return -1, -1
+    ix = 0
+    while ix < len(sample_list) and not (sample_list[ix][Fields.start] <= time <= sample_list[ix][Fields.end]):
+        ix += 1
+    if ix == len(sample_list):
+        return -1, -1
+    return sample_list[ix][Fields.label], ix
 
 
 def print_matched_set(matched_set, print_endpoints=False):
     start = sys.maxsize
     end = 0
-    max_len = 1
-    for sample in matched_set:
-        if type(sample) == list:
-            cur_start = sample[0][Fields.start]
-            cur_end = sample[-1][Fields.end]
-            if len(sample) > max_len:
-                max_len = len(sample)
-        else:
-            cur_start = sample[Fields.start]
-            cur_end = sample[Fields.end]
-        if cur_start < start:
-            start = cur_start
-        if cur_end > end:
-            end = cur_end
-    label_array = np.zeros((max_len, len(matched_set)), dtype=np.int32)
-    border_array = np.zeros((max_len - 1, len(matched_set)), dtype=np.bool)
-    time_increment = end - start / max_len
-    current_time = start
-    current_labels = np.zeros(shape=(len(matched_set),), dtype=np.int32)
-    for ix_sample, sample in enumerate(matched_set):
-        current_labels[ix_sample] = label_at_time(sample, current_time)
-    label_array[0] = current_labels
-    previous_labels = current_labels
-    current_time += time_increment
-    for ix_step in range(1, max_len):
-        for ix_sample, sample in enumerate(matched_set):
-            current_labels[ix_sample] = label_at_time(sample, current_time)
-            if current_labels[ix_sample] != previous_labels[ix_sample]:
-                border_array[ix_step - 1, ix_sample] = True
-            label_array[ix_step] = current_labels
-        current_time += time_increment
+    change_points = set()
+    for sample_list in matched_set:
+        for sample in sample_list[1:]:
+            change_points.add(sample[Fields.start])
+    change_points = list(change_points)
+    change_points.sort()
 
-    for ix_sample in range(0, len(matched_set)):
+    label_array = np.zeros((len(change_points) + 1, len(matched_set)), dtype=np.int32)
+    start_point_array = -np.ones((len(change_points) + 1, len(matched_set)), dtype=np.int32)
+    end_point_array = -np.ones((len(change_points) + 1, len(matched_set)), dtype=np.int32)
+    border_array = np.zeros((len(change_points) + 1, len(matched_set)), dtype=np.bool)
+
+    current_labels = np.zeros(shape=(len(matched_set),), dtype=np.int32)
+    for ix_view, sample_list in enumerate(matched_set):
+        if len(sample_list) > 0:
+            current_labels[ix_view] = sample_list[0][Fields.label]
+            start_point_array[0][ix_view] = sample_list[0][Fields.start]
+        else:
+            current_labels[ix_view] = -1
+    previous_labels = current_labels
+    label_array[0] = current_labels
+
+    for ix_step, current_time in enumerate(change_points):
+        current_labels = np.zeros(shape=(len(matched_set),), dtype=np.int32)
+        for ix_view, sample_list in enumerate(matched_set):
+            current_labels[ix_view], ix_sample = label_at_time(sample_list, current_time)
+            if current_labels[ix_view] != previous_labels[ix_view]:
+                end_point_array[ix_step, ix_view] = -1 if ix_sample < 0 else sample_list[ix_sample - 1][Fields.end]
+                border_array[ix_step, ix_view] = True  # previous cells
+                start_point_array[ix_step + 1, ix_view] = -1 if ix_sample < 0 else sample_list[ix_sample][Fields.start]
+
+            label_array[ix_step + 1] = current_labels
+
+    for ix_view, sample_list in enumerate(matched_set):
+        if len(sample_list) > 0:
+            end_point_array[len(change_points), ix_view] = sample_list[-1][Fields.end]
+
+    for ix_view in range(0, len(matched_set)):
         print("|              |", end="")
     print("\n", end="")
-    for ix_step in range(0, max_len - 1):
-        for ix_sample in range(0, len(matched_set)):
-            print("|{:^14}|".format(label_array[ix_step, ix_sample]), end="")
+    for ix_step in range(0, len(change_points) + 1):
+        if print_endpoints:
+            for ix_view in range(0, len(matched_set)):
+                start = start_point_array[ix_step, ix_view]
+                if start >= 0:
+                    print("|{:^14}|".format("from: " + str(start)), end="")
+                else:
+                    print("|              |", end="")
+            print("\n", end="")
+        for ix_view in range(0, len(matched_set)):
+            label = label_array[ix_step, ix_view]
+            if label >= 0:
+                print("|{:^14}|".format(label), end="")
+            else:
+                print("|       ?      |", end="")
         print("\n", end="")
-        for ix_sample in range(0, len(matched_set)):
-            if border_array[ix_step, ix_sample]:
+        if print_endpoints:
+            for ix_view in range(0, len(matched_set)):
+                end = end_point_array[ix_step, ix_view]
+                if end >= 0:
+                    print("|{:^14}|".format("to: " + str(end)), end="")
+                else:
+                    print("|              |", end="")
+            print("\n", end="")
+        for ix_view in range(0, len(matched_set)):
+            if border_array[ix_step, ix_view]:
                 print("================", end="")
             else:
                 print("|              |", end="")
         print("\n", end="")
-    for ix_sample in range(0, len(matched_set)):
-        print("|{:^14}|".format(label_array[-1, ix_sample]), end="")
-    print("\n", end="")
-    for ix_sample in range(0, len(matched_set)):
-        print("|              |", end="")
-    print("\n", end="")
-    for ix_sample in range(0, len(matched_set)):
+    for ix_view in range(0, len(matched_set)):
         print("================", end="")
     print("\n", end="")
 
 
 def print_multiview_headers(view_names):
-    width = len(view_names)
-    for i in view_names:
+    for _ in view_names:
         print("================", end="")
     sys.stdout.write("\n")
-    for name in view_names:
+    for _ in view_names:
         print("|              |", end="")
     print("\n", end="")
     for name in view_names:
         print("|{:^14}|".format(name), end="")
     print("\n", end="")
-    for name in view_names:
+    for _ in view_names:
         print("|              |", end="")
     print("\n", end="")
-    for i in view_names:
+    for _ in view_names:
         print("================", end="")
+    print("\n", end="")
+
+
+def print_appended_line(view_count):
+    for i in range(0, view_count):
+        print("|      (a)     |", end="")
+    print("\n", end="")
+
+
+def print_mismatch_line(view_count):
+    for i in range(0, view_count):
+        print("|      (!)     |", end="")
     print("\n", end="")
 
 
 def print_matched_labels(matched_labels, view_names):
     print_multiview_headers(view_names)
-    for set in matched_labels:
-        print_matched_set(set)
+    for matched_set in matched_labels:
+        print_matched_set(matched_set)
 
 
 def main():
     args = process_arguments(Arguments, "text label -> JSON Label Converter for LSTM")
     verbosity = 1
     if args.multiview_only and args.single_view_only:
-        raise ValueError("{s} and {s} arguments cannot be combined.".format(Arguments.single_view_only.name,
-                                                                            Arguments.multiview_only.name))
+        raise ValueError("{:s} and {:s} arguments cannot be combined.".format(Arguments.single_view_only.name,
+                                                                              Arguments.multiview_only.name))
     input_paths = []
     view_names = []
 
@@ -194,7 +222,7 @@ def main():
                 feature_file_name = view_name + "_features.npz"
                 feature_path = os.path.join(args.folder, feature_file_name)
                 if not os.path.isfile(feature_path):
-                    raise (IOError("Cound not find feature file at {:s}. Each label text file should have a " +
+                    raise (IOError("Could not find feature file at {:s}. Each label text file should have a " +
                                    "corresponding feature file.".format(feature_path)))
                 input_paths.append((file_path, feature_path))
                 view_names.append(view_name)
@@ -331,32 +359,65 @@ def main():
 
     multiview_samples = [{sample[Fields.start]: sample for sample in multiview_sample_set} for multiview_sample_set in
                          multiview_samples]
-    matched_samples = {}
+    matched_samples = []
+    view_count = len(view_names)
 
-    for ix_source_view, source_view in enumerate(view_names):
-        source_samples = multiview_samples[ix_source_view]
-        source_to_delete = []
-        for source_start_time in source_samples.keys():
-            source_sample = source_sample[source_start_time]
-            matched_set = [None]*len(view_names)
-            matched_set[ix_source_view] = source_sample
-            for ix_target_view, target_view in enumerate(view_names):
-                if ix_target_view != ix_source_view:
-                    target_samples = multiview_samples[ix_target_view]
+    ix_frame = 0
+    print_multiview_headers(view_names)
+    previous_label = -1
+    prevous_sample_set = None
+    while ix_frame < frame_count:
+        sample_found = False
+        sample_set = [[] for i in range(view_count)]
+        window_end = sys.maxsize
+        have_non_blank_label = False
+        non_blank_label = -1
+        window_start = ix_frame
+        while not sample_found and ix_frame < frame_count:
+            for ix_view, view_samples in enumerate(multiview_samples):
+                if ix_frame in view_samples:
+                    sample_found = True
+                    sample = view_samples[ix_frame]
+                    window_end = min(window_end, sample[Fields.end] + 1)
+                    if sample[Fields.label] != label_mapping['X']:
+                        have_non_blank_label = True
+                        non_blank_label = sample[Fields.label]
+            ix_frame += 1
+        if not have_non_blank_label:
+            ix_frame = window_end
+            continue
+        label_mismatch = False
+        for ix_frame in range(window_start, window_end):
+            for ix_view, view_samples in enumerate(multiview_samples):
+                if ix_frame in view_samples:
+                    sample = view_samples[ix_frame]
+                    if window_end - sample[Fields.start] > args.time_offset_threshold:
+                        if sample[Fields.label] != label_mapping['X'] and sample[Fields.label] != non_blank_label:
+                            label_mismatch = True
+                        sample_set[ix_view].append(sample)
 
+        if label_mismatch:
+            print_mismatch_line(view_count)
+        if previous_label == non_blank_label:
+            print_appended_line(view_count)
+            print_matched_set(sample_set, True)
+            for ix_view in range(len(view_names)):
+                prevous_sample_set[ix_view] = prevous_sample_set[ix_view] + sample_set[ix_view]
+            sample_set = prevous_sample_set
+            matched_samples[-1] = sample_set
+        else:
+            matched_samples.append(sample_set)
+            print_matched_set(sample_set, True)
+        if label_mismatch:
+            raise ValueError("Label mismatch (see above diagram)!")
 
-
-        for source_start_time in source_to_delete:
-            del source_samples[source_start_time]
-
-    matched_sample_start_times = list(matched_samples.keys())
-    matched_sample_start_times.sort()
-    ordered_matched_samples = [matched_samples[start_time] for start_time in matched_sample_start_times]
-
+        previous_label = non_blank_label
+        prevous_sample_set = sample_set
+        ix_frame = window_end
 
     output_path = os.path.join(args.folder, "multiview_samples.json")
     file_handle = open(output_path, 'w')
-    json.dump(ordered_matched_samples, file_handle, indent=3)
+    json.dump(matched_samples, file_handle, indent=3)
     file_handle.close()
 
     return 0

@@ -12,6 +12,7 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
     DRAW_BBOX = True
     DRAW_FRAME_N = True
     DRAW_VALUE = True
+    SHOW_INTERSECTS = True
 
     @staticmethod
     def make_parser(help_string):
@@ -30,8 +31,9 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
                                                                 self.prev_frame_centroid)
         self.mask = mask
         foreground = super().extract_foreground()
+        self.draw_other_stuff(foreground, dist)
         if contour_found:
-            self.draw_silhouette(foreground, bin_mask, tracked_object_stats, largest_centroid, dist)
+            self.draw_silhouette(foreground, bin_mask, tracked_object_stats, largest_centroid)
             self.prev_frame_centroid = largest_centroid
             bbox_w_h_ratio = tracked_object_stats[cv2.CC_STAT_WIDTH] / tracked_object_stats[cv2.CC_STAT_HEIGHT]
             self.result_data.append((self.cur_frame_number, tracked_px_count, bbox_w_h_ratio, largest_centroid[0],
@@ -46,30 +48,10 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
     def __to_int_tuple(np_array):
         return int(round(np_array[0])), int(round(np_array[1]))
 
-    def draw_silhouette(self, foreground, bin_mask, tracked_object_stats, centroid, value):
-        contours = cv2.findContours(bin_mask, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)[1]
-        for i_contour in range(0, len(contours)):
-            cv2.drawContours(foreground, contours, i_contour, (0, 255, 0))
+    def intersects_frame_boundary(self, x1, x2, y1, y2):
+        return x1 == 0 or y1 == 0 or x2 == self.frame.shape[1] or y2 == self.frame.shape[0]
 
-        if SilhouetteExtractor.DRAW_BBOX:
-            x1 = tracked_object_stats[cv2.CC_STAT_LEFT]
-            x2 = x1 + tracked_object_stats[cv2.CC_STAT_WIDTH]
-            y1 = tracked_object_stats[cv2.CC_STAT_TOP]
-            y2 = y1 + tracked_object_stats[cv2.CC_STAT_HEIGHT]
-            cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
-            cv2.drawMarker(foreground, SilhouetteExtractor.__to_int_tuple(centroid), (0, 0, 255), cv2.MARKER_CROSS, 11)
-            bbox_w_h_ratio = tracked_object_stats[cv2.CC_STAT_WIDTH] / tracked_object_stats[cv2.CC_STAT_HEIGHT]
-            cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1 - 18),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255))
-        #
-        # if SilhouetteExtractor.DRAW_COMPONENTS:
-        #     stats = self.cc_stats
-        #     for i_comp in range(1, len(stats)):
-        #         x1 = stats[i_comp, cv2.CC_STAT_LEFT]
-        #         x2 = x1 + stats[i_comp, cv2.CC_STAT_WIDTH]
-        #         y1 = stats[i_comp, cv2.CC_STAT_TOP]
-        #         y2 = y1 + stats[i_comp, cv2.CC_STAT_HEIGHT]
-        #         cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
+    def draw_other_stuff(self, foreground, value):
 
         if SilhouetteExtractor.DRAW_FRAME_N:
             cv2.putText(foreground, str(self.cur_frame_number), (0, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
@@ -77,6 +59,25 @@ class SilhouetteExtractor(VideoBackgroundSubtractor):
         if SilhouetteExtractor.DRAW_VALUE:
             cv2.putText(foreground, str(value), (0, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                         (0, 255, 0))
+
+    def draw_silhouette(self, foreground, bin_mask, tracked_object_stats, centroid):
+        contours = cv2.findContours(bin_mask, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)[1]
+        for i_contour in range(0, len(contours)):
+            cv2.drawContours(foreground, contours, i_contour, (0, 255, 0))
+        x1 = tracked_object_stats[cv2.CC_STAT_LEFT]
+        x2 = x1 + tracked_object_stats[cv2.CC_STAT_WIDTH]+1
+        y1 = tracked_object_stats[cv2.CC_STAT_TOP]
+        y2 = y1 + tracked_object_stats[cv2.CC_STAT_HEIGHT]+1
+        if SilhouetteExtractor.DRAW_BBOX:
+            cv2.rectangle(foreground, (x1, y1), (x2, y2), color=(0, 0, 255))
+            cv2.drawMarker(foreground, SilhouetteExtractor.__to_int_tuple(centroid), (0, 0, 255), cv2.MARKER_CROSS, 11)
+            bbox_w_h_ratio = tracked_object_stats[cv2.CC_STAT_WIDTH] / tracked_object_stats[cv2.CC_STAT_HEIGHT]
+            cv2.putText(foreground, "BBOX w/h ratio: {0:.4f}".format(bbox_w_h_ratio), (x1, y1 - 18),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255))
+        if SilhouetteExtractor.SHOW_INTERSECTS:
+            if self.intersects_frame_boundary(x1, x2, y1, y2):
+                cv2.putText(foreground, "FRAME BORDER INTERSECT DETECTED", (0, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
+                            (0, 0, 255))
 
     def save_results(self, verbose=False):
         largest_component_sizes = np.array(self.result_data)
