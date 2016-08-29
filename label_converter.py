@@ -45,9 +45,9 @@ class Fields(object):
 
 def generate_sample_dict(beginning_frame, end_frame, label):
     sample = OrderedDict()
-    sample[Fields.start] = int(beginning_frame)
-    sample[Fields.end] = int(end_frame)
-    sample[Fields.label] = int(label)
+    sample[Fields.start] = beginning_frame
+    sample[Fields.end] = end_frame
+    sample[Fields.label] = label
     return sample
 
 
@@ -191,10 +191,32 @@ def print_mismatch_line(view_count):
     print("\n", end="")
 
 
+def print_offsets(offsets):
+    for offset in offsets:
+        print("|{:^14}|".format("offset: " + str(offset)), end="")
+    print("\n", end="")
+    for _ in offsets:
+        print("================", end="")
+    print("\n", end="")
+
+
 def print_matched_labels(matched_labels, view_names):
     print_multiview_headers(view_names)
     for matched_set in matched_labels:
         print_matched_set(matched_set)
+
+
+def calculate_view_offset_at(offset_points, timestep):
+    if len(offset_points) == 1:
+        return offset_points[0][1]
+    ix = 0
+    while ix < len(offset_points) and not offset_points[ix][0] > timestep:
+        ix += 1
+    if ix < len(offset_points):
+        offset_range = offset_points[ix][0] - offset_points[ix - 1][0]
+        ratio = (timestep - offset_points[ix - 1][0]) / offset_range
+        return int(round(offset_points[ix - 1][1] * (1.0 - ratio) + offset_points[ix][1] * ratio))
+    return offset_points[-1][1]
 
 
 def main():
@@ -207,7 +229,8 @@ def main():
     view_names = []
 
     x_re = re.compile(r"\[\s*out of visual field\s*\]|\[\s*out of frame\s*\]")
-    parse_re = re.compile(r"(\d+)\s*(?:\(\?\))?\s*-\s*(\d+)\s*(?:\(\?\))?(?::|;)?\s*(R|G|S|X)\s*?(\?)?\s*")
+    parse_re = re.compile(
+        r"(\d+)\s*(?:\(\?\))?\s*-\s*(\d+)\s*(?:\(\?\))?(?::|;)?\s*(R|G|S|X)\s*?(\?)?\s*(?:\s*\+(\d+))?")
 
     # determine input file paths
     default_input_file_ending = "_labels.txt"
@@ -246,6 +269,7 @@ def main():
             view_names.append(view_name)
 
     multiview_samples = []
+    view_offsets = []
 
     frame_count = sys.maxsize
 
@@ -283,18 +307,22 @@ def main():
         default_behavior_label = 4
         samples = []
 
+        offset_points = [(0, 0)]
+
         # parse the label file
         for line in lines:
             line = x_re.sub("X", line, re.IGNORECASE)
-            match = parse_re.match(line)
-            if match:
-                if match.group(4) is None:
-                    beginning = int(match.group(1))
-                    end = int(match.group(2))
-                    label = label_mapping[match.group(3)]
+            match_range = parse_re.match(line)
+            if match_range:
+                if match_range.group(4) is None:
+                    start = int(match_range.group(1))
+                    end = int(match_range.group(2))
+                    label = label_mapping[match_range.group(3)]
                     if label != 0:  # drop manual X labels; we will read them from the features file
-                        samples.append(generate_sample_dict(beginning, end, label))
-
+                        samples.append(generate_sample_dict(start, end, label))
+                if match_range.group(5) is not None:
+                    offset_point = int(match_range.group(5))
+                    offset_points.append((start, offset_point))
             else:
                 print("Unmatched line: {:s}".format(line))
         if verbosity >= 1:
@@ -354,6 +382,7 @@ def main():
             file_handle.close()
 
         multiview_samples.append(samples)
+        view_offsets.append(offset_points)
 
     if args.single_view_only:
         return 0
@@ -367,18 +396,26 @@ def main():
     print_multiview_headers(view_names)
     previous_label = -1
     prevous_sample_set = None
+    offsets = [0] * view_count
+    # move a sliding search window along all the views
     while ix_frame < frame_count:
         sample_found = False
-        sample_set = [[] for i in range(view_count)]
+        sample_set = [[] for _ in range(view_count)]
         window_end = sys.maxsize
+        window_start = sys.maxsize
         have_non_blank_label = False
         non_blank_label = -1
         window_start = ix_frame
+        # find the first stample with some kind of the label past the end of the previous window
         while not sample_found and ix_frame < frame_count:
             for ix_view, view_samples in enumerate(multiview_samples):
-                if ix_frame in view_samples:
+                view_offset = calculate_view_offset_at(view_offsets[ix_view], ix_frame)
+                ix_local_frame = ix_frame + view_offset
+                if ix_local_frame in view_samples:
                     sample_found = True
-                    sample = view_samples[ix_frame]
+                    window_start = ix_frame
+                    sample = view_samples[ix_local_frame]
+                    # set the window's stopping point based on minimal length of the samples discovered first
                     window_end = min(window_end, sample[Fields.end] + 1)
                     if sample[Fields.label] != label_mapping['X']:
                         have_non_blank_label = True
@@ -388,14 +425,26 @@ def main():
             ix_frame = window_end
             continue
         label_mismatch = False
+        # actually traverse the window, looking for samples from all views to match
+        new_window_start = window_end
         for ix_frame in range(window_start, window_end):
             for ix_view, view_samples in enumerate(multiview_samples):
-                if ix_frame in view_samples:
-                    sample = view_samples[ix_frame]
-                    if window_end - sample[Fields.start] > args.time_offset_threshold:
+                view_offset = calculate_view_offset_at(view_offsets[ix_view], ix_frame)
+                ix_local_frame = ix_frame + view_offset
+                if ix_local_frame in view_samples:
+                    sample = view_samples[ix_local_frame]
+                    if window_end - ix_local_frame > args.time_offset_threshold:
                         if sample[Fields.label] != label_mapping['X'] and sample[Fields.label] != non_blank_label:
                             label_mismatch = True
                         sample_set[ix_view].append(sample)
+
+        current_offsets = []
+        for ix_view in range(view_count):
+            current_offsets.append(calculate_view_offset_at(view_offsets[ix_view], window_start))
+            sample_list = sample_set[ix_view]
+            if len(sample_list) > 0:
+                new_window_start = min(new_window_start, sample_list[-1][Fields.end] + 1)
+        print_offsets(current_offsets)
 
         if label_mismatch:
             print_mismatch_line(view_count)
@@ -414,7 +463,7 @@ def main():
 
         previous_label = non_blank_label
         prevous_sample_set = sample_set
-        ix_frame = window_end
+        ix_frame = new_window_start
 
     output_path = os.path.join(args.folder, "multiview_samples.json")
     file_handle = open(output_path, 'w')
