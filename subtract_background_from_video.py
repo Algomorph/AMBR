@@ -39,7 +39,7 @@ class BaseVideoBackgroundSubtractor(VideoProcessor):
             print(("Notice: sampling_interval_end_frame is set to {0:d}, which is beyond the limit imposed by " +
                    "sampling interval ({1:f}), fps {2:.2f}, and number of samples ({3:d}). " +
                    "Changing it to {4:d} to save time.")
-                  .format(start, self.sampling_interval, self.fps, self.num_samples, max_end))
+                  .format(self.sampling_interval_end_frame, self.sampling_interval, self.fps, self.num_samples, max_end))
             end = max_end
 
         if verbose:

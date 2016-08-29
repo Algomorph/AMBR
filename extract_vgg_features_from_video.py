@@ -91,9 +91,9 @@ class VideoVGGFeatureExtractor(BaseVideoBackgroundSubtractor):
             foreground = self.frame.copy()
             foreground[bin_mask == 0] = 0
             x1 = tracked_object_stats[cv2.CC_STAT_LEFT]
-            x2 = x1 + tracked_object_stats[cv2.CC_STAT_WIDTH]
+            x2 = x1 + tracked_object_stats[cv2.CC_STAT_WIDTH] + 1
             y1 = tracked_object_stats[cv2.CC_STAT_TOP]
-            y2 = y1 + tracked_object_stats[cv2.CC_STAT_HEIGHT]
+            y2 = y1 + tracked_object_stats[cv2.CC_STAT_HEIGHT] + 1
             if self.boundary_check and self.intersects_frame_boundary(x1, x2, y1, y2):
                 if not self.no_vgg:
                     features = self.blank_features.copy()

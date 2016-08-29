@@ -116,7 +116,8 @@ def print_matched_set(matched_set, print_endpoints=False):
                 border_array[ix_step, ix_view] = True  # previous cells
                 start_point_array[ix_step + 1, ix_view] = -1 if ix_sample < 0 else sample_list[ix_sample][Fields.start]
 
-            label_array[ix_step + 1] = current_labels
+        label_array[ix_step + 1] = current_labels
+        previous_labels = current_labels
 
     for ix_view, sample_list in enumerate(matched_set):
         if len(sample_list) > 0:
