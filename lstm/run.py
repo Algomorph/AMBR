@@ -51,7 +51,7 @@ def to_numpy_theano_float(data):
     return np.asarray(data, dtype=config.floatX)
 
 
-def get_minibatches_idx(n, minibatch_size, shuffle=False):
+def get_minibatch_indexes(n, minibatch_size, shuffle=False):
     """
     Used to shuffle the dataset at each iteration.
     """
@@ -68,12 +68,11 @@ def get_minibatches_idx(n, minibatch_size, shuffle=False):
         minibatch_start + minibatch_size])
         minibatch_start += minibatch_size
 
-    if (minibatch_start != n):
+    if minibatch_start != n:
         # Make a minibatch out of what is left
         minibatches.append(idx_list[minibatch_start:])
 
     return list(zip(list(range(len(minibatches))), minibatches))
-
 
 
 def grad_array(tgrad):
@@ -203,7 +202,7 @@ def test_lstm(model_output_path, args, result_dir=None):
      f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model,
                                                                    hidden_unit_count=args.hidden_unit_count)
 
-    kf_test = get_minibatches_idx(len(test[0]), args.validation_batch_size)
+    kf_test = get_minibatch_indexes(len(test[0]), args.validation_batch_size)
     print("%d test examples" % len(test[0]))
 
     probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, test, kf_test, args.category_count,
@@ -254,9 +253,9 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     print('Loading data')
     train, valid, test, n_categories = load_data(args.datasets, args.folder)
-    print("%d train examples" % len(train[0]))
-    print("%d valid examples" % len(valid[0]))
-    print("%d test examples" % len(test[0]))
+    print("%d training examples" % len(train[0]))
+    print("%d validation examples" % len(valid[0]))
+    print("%d testing examples" % len(test[0]))
 
     print('Initializing the model...')
 
@@ -296,8 +295,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     print('Training the model...')
 
-    kf_valid = get_minibatches_idx(len(valid[0]), args.validation_batch_size)
-    kf_test = get_minibatches_idx(len(test[0]), args.validation_batch_size)
+    kf_valid = get_minibatch_indexes(len(valid[0]), args.validation_batch_size)
+    kf_test = get_minibatch_indexes(len(test[0]), args.validation_batch_size)
 
     history_errs = []
     eidx_a = []
@@ -313,7 +312,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
             n_samples = 0
 
             # Get new shuffled index for the training set.
-            kf = get_minibatches_idx(len(train[0]), args.batch_size, shuffle=True)
+            kf = get_minibatch_indexes(len(train[0]), args.batch_size, shuffle=True)
 
             for _, train_index in kf:
                 uidx += 1
@@ -404,7 +403,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
         best_parameters = model.as_dict()
 
     use_noise_flag.set_value(0.)
-    kf_train_sorted = get_minibatches_idx(len(train[0]), args.batch_size)
+    kf_train_sorted = get_minibatch_indexes(len(train[0]), args.batch_size)
     train_err = compute_prediction_error(f_pred, train, kf_train_sorted)
     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
     test_err = compute_prediction_error(f_pred, test, kf_test)
