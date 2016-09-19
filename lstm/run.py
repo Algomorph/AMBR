@@ -61,18 +61,18 @@ def get_minibatch_indexes(n, minibatch_size, shuffle=False):
     if shuffle:
         np.random.shuffle(idx_list)
 
-    minibatches = []
+    minibatch = []
     minibatch_start = 0
     for i in range(n // minibatch_size):
-        minibatches.append(idx_list[minibatch_start:
+        minibatch.append(idx_list[minibatch_start:
         minibatch_start + minibatch_size])
         minibatch_start += minibatch_size
 
     if minibatch_start != n:
         # Make a minibatch out of what is left
-        minibatches.append(idx_list[minibatch_start:])
+        minibatch.append(idx_list[minibatch_start:])
 
-    return list(zip(list(range(len(minibatches))), minibatches))
+    return list(zip(list(range(len(minibatch))), minibatch))
 
 
 def grad_array(tgrad):
@@ -304,18 +304,17 @@ def train_lstm(model_output_path, args, check_gradients=False):
     if save_interval == -1:
         save_interval = len(train[0]) / args.batch_size
 
-    uidx = 0  # the number of update done
-    estop = False  # early stop
+    current_update_index = 0
+    early_stop = False
     start_time = time.time()
     try:
-        for eidx in range(args.max_epochs):
+        for epoch_index in range(args.max_epochs):
             n_samples = 0
 
             # Get new shuffled index for the training set.
             kf = get_minibatch_indexes(len(train[0]), args.batch_size, shuffle=True)
 
             for _, train_index in kf:
-                uidx += 1
                 use_noise_flag.set_value(1.)
 
                 # Select the random examples for this minibatch
@@ -350,22 +349,22 @@ def train_lstm(model_output_path, args, check_gradients=False):
                     else:
                         raise ValueError("NaN dectected in cost. Aborting.")
 
-                if uidx % args.display_interval == 0:
-                    print('Epoch ', eidx, 'Update ', uidx, 'Cost ', cost)
+                if current_update_index % args.display_interval == 0:
+                    print('Epoch ', epoch_index, 'Update ', current_update_index, 'Cost ', cost)
 
-                if model_output_path and uidx % save_interval == 0:
+                if model_output_path and current_update_index % save_interval == 0:
                     print('Saving...', end=' ')
                     model.save_to_numpy_archive(model_output_path)
                     print('Done')
 
-                if uidx % args.validation_interval == 0:
+                if current_update_index % args.validation_interval == 0:
                     use_noise_flag.set_value(0.)
                     train_err = compute_prediction_error(f_pred, train, kf)
                     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
                     test_err = compute_prediction_error(f_pred, test, kf_test)
 
                     history_errs.append([train_err, valid_err, test_err])
-                    eidx_a.append([eidx, eidx, eidx])
+                    eidx_a.append([epoch_index, epoch_index, epoch_index])
 
                     plt.figure(1)
                     plt.clf()
@@ -374,7 +373,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
                     plt.savefig("err.png")
                     time.sleep(0.1)
 
-                    if uidx == 0 or valid_err <= np.array(history_errs)[:, 1].min():
+                    if current_update_index == 0 or valid_err <= np.array(history_errs)[:, 1].min():
                         best_parameters = model.as_dict()
                         bad_counter = 0
                         if valid_err < np.array(history_errs)[:, 1].min():
@@ -387,12 +386,13 @@ def train_lstm(model_output_path, args, check_gradients=False):
                         bad_counter += 1
                         if bad_counter > args.patience:
                             print('Early Stop!')
-                            estop = True
+                            early_stop = True
                             break
+                current_update_index += 1
 
             print('Seen %d samples' % n_samples)
 
-            if estop:
+            if early_stop:
                 break
 
     except KeyboardInterrupt:
@@ -414,7 +414,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
                  valid_err=valid_err, test_err=test_err,
                  history_errs=history_errs, **best_parameters)
     print('The code run for %d epochs, with %f sec/epochs' % (
-        (eidx + 1), (end_time - start_time) / (1. * (eidx + 1))))
+        (epoch_index + 1), (end_time - start_time) / (1. * (epoch_index + 1))))
     print(('Training took %.1fs' %
            (end_time - start_time)), file=sys.stderr)
     return train_err, valid_err, test_err

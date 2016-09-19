@@ -177,9 +177,9 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
                    model.globals.classifier_weights) + model.globals.classifier_bias)
 
     # formerly "f_pred_prob" and "f_pred"
-    sample_prediction_probability_function = theano.function([x, masks], sample_prediction,
+    compute_sample_classification_probability = theano.function([x, masks], sample_prediction,
                                                              name='prediction_probability_function')
-    sample_prediction_function = theano.function([x, masks], sample_prediction.argmax(axis=1),
+    classify_sequence = theano.function([x, masks], sample_prediction.argmax(axis=1),
                                                  name='prediction_function')
 
     # formerly "out_proj_all"
@@ -194,7 +194,7 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
                                                 n_steps=n_timesteps_in_sample)
 
     # formerly "f_pred_prob_all"
-    timestep_prediction_function = theano.function([x, masks], timestep_predictions, name='f_pred_prob_all')
+    classify_timestep = theano.function([x, masks], timestep_predictions, name='f_pred_prob_all')
 
     # hidden_all
     network_state = [timestep_projections_unmasked,
@@ -209,7 +209,7 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
                      model.globals.classifier_bias,
                      model.globals.embedding_weights]  # 10 in total
 
-    network_state_function = theano.function([x, masks], network_state, name='hidden_status')
+    get_network_state = theano.function([x, masks], network_state, name='hidden_status')
 
     off = 1e-8
     if sample_prediction.dtype == 'float16':
@@ -223,5 +223,5 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
         cost_weights = None
         cost = -tensor.log(sample_prediction[tensor.arange(n_samples_in_batch), y] + off).mean()
 
-    return noise_bool_flag, x, masks, cost_weights, y, sample_prediction_probability_function, \
-           sample_prediction_function, cost, timestep_prediction_function, network_state_function
+    return noise_bool_flag, x, masks, cost_weights, y, compute_sample_classification_probability, \
+           classify_sequence, cost, classify_timestep, get_network_state

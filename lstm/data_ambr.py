@@ -79,13 +79,13 @@ def load_data(datasets, base_work_folder):
         print('  dataset length: ', len(label_entries))
 
         # load the image features into memory
-        features_path = os.path.join(base_data_path, "{:s}_vgg.npz".format(obj))
+        features_path = os.path.join(base_data_path, "{:s}_features.npz".format(obj))
         print('  loading features from: %s' % (features_path,))
         archive = np.load(features_path)
-        all_features = archive[archive.files[0]]
+        all_features = archive["features"]
 
         for entry in label_entries:
-            sample_features = all_features[entry['beginning']:entry['end'] + 1, :]
+            sample_features = all_features[entry['start']:entry['end'] + 1, :]
             if len(sample_features) == 0:
                 raise ValueError("Got input sequence length 0: {:s}".format(str(entry)))
 
@@ -126,7 +126,6 @@ def load_data(datasets, base_work_folder):
 
     weights_by_label = len(train_set_x) / (np.count_nonzero(sample_counts_per_label) * sample_counts_per_label)
     weights_by_label[weights_by_label == inf] = 0
-    print(weights_by_label)
     train_set_weights = [weights_by_label[y] for y in train_set_y]
 
     test_set_x = [features_by_sample[s] for s in sidx[0:test_count]]
