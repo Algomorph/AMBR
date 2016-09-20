@@ -25,7 +25,7 @@ import matplotlib as mpl
 
 # local
 from lstm.optimizer import adadelta, sgd, rmsprop
-from lstm.data_ambr import load_data, prepare_data
+from lstm.data_io import load_data, prepare_data
 from lstm.arguments import Arguments
 from ext_argparse.argproc import process_arguments
 

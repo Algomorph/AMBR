@@ -29,11 +29,11 @@ def numpy_float_x(data):
     return np.asarray(data, dtype=config.floatX)
 
 
-def build_lstm_layer(model, lstm_input, masks=None):
+def build_lstm_layer(parameters, lstm_input, masks=None):
     """
     :param lstm_input: input batch
-    :type model: Parameters
-    :param model: embedding & lstm input layers
+    :type parameters: Parameters
+    :param parameters: embedding & lstm input layers
     :param masks: masks that cancel out the effect of the "empty" tail of each sequence (due to samples being of different lengths)
     :return:
     """
@@ -44,10 +44,10 @@ def build_lstm_layer(model, lstm_input, masks=None):
         n_samples_in_batch = 1
 
     lstm_input_weighted = (
-        tensor.dot(lstm_input, model.lstm.input_weights)
-        + model.lstm.bias)
+        tensor.dot(lstm_input, parameters.lstm.input_weights)
+        + parameters.lstm.bias)
 
-    h_u_c = model.hidden_unit_count
+    h_u_c = parameters.hidden_unit_count
 
     assert masks is not None
 
@@ -58,7 +58,7 @@ def build_lstm_layer(model, lstm_input, masks=None):
 
     def lstm_step(input_mask, layer_input, previous_hidden_unit, previous_cell, previous_input_gate,
                   previous_forget_gate, previous_output_gate):
-        network_after_update = tensor.dot(previous_hidden_unit, model.lstm.hidden_weights)
+        network_after_update = tensor.dot(previous_hidden_unit, parameters.lstm.hidden_weights)
         network_after_update += layer_input
 
         # squash inputs from embedding layer
@@ -78,11 +78,11 @@ def build_lstm_layer(model, lstm_input, masks=None):
 
         return new_hidden_unit, new_cell, new_input_gate, new_forget_gate, new_output_gate
 
-    init_hidden = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, model.hidden_unit_count)
-    init_cell = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, model.hidden_unit_count)
-    init_input = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, model.hidden_unit_count)
-    init_forget = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, model.hidden_unit_count)
-    init_output = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, model.hidden_unit_count)
+    init_hidden = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, parameters.hidden_unit_count)
+    init_cell = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, parameters.hidden_unit_count)
+    init_input = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, parameters.hidden_unit_count)
+    init_forget = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, parameters.hidden_unit_count)
+    init_output = tensor.alloc(numpy_float_x(0.), n_samples_in_batch, parameters.hidden_unit_count)
 
     (hidden_unit, cell, input_gate, forget_gate, output_gate), updates = theano.scan(lstm_step,
                                                                                      sequences=[masks,
@@ -120,14 +120,14 @@ def build_dropout_layer(input_projection, noise_bool_flag, random_seed):
     return output_projection
 
 
-def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016):
+def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed=2016):
     """
     :type weighted_cost: bool
     :param weighted_cost: whether to weigh the output costs
     :param random_seed: random seed to use for dropout noise
     :see build_dropout_layer
-    :type model: Parameters
-    :param model: parameters of the LSTM network
+    :type parameters: Parameters
+    :param parameters: parameters of the LSTM network
     :param use_dropout: whether or not to use dropout
     :return: all network inputs and tensor functions
     """
@@ -147,10 +147,10 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
     n_timesteps_in_sample = x.shape[0]
     n_samples_in_batch = x.shape[1]
 
-    embedding_output = theano.dot(x, model.globals.embedding_weights)
+    embedding_output = theano.dot(x, parameters.globals.embedding_weights)
 
     timestep_projections_unmasked, cell_state, input_gate_sate, forget_gate_state, output_gate_state \
-        = build_lstm_layer(model, embedding_output, masks=masks)
+        = build_lstm_layer(parameters, embedding_output, masks=masks)
 
     # mean pooling
     # weight_gradient = [index of time step] / [total number of unmasked time steps]
@@ -167,25 +167,25 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
     sample_projection = sample_projection / masks.sum(axis=0)[:, None]
 
     # deal with dropout
-    noise_bool_flag = theano.shared(numpy_float_x(0.))
+    noise_flag = theano.shared(numpy_float_x(0.))
     if use_dropout:
-        sample_projection = build_dropout_layer(sample_projection, noise_bool_flag, random_seed)
+        sample_projection = build_dropout_layer(sample_projection, noise_flag, random_seed)
 
     # formerly "pred"
-    sample_prediction = tensor.nnet.softmax(
+    sequence_class_prediction = tensor.nnet.softmax(
         tensor.dot(sample_projection,
-                   model.globals.classifier_weights) + model.globals.classifier_bias)
+                   parameters.globals.classifier_weights) + parameters.globals.classifier_bias)
 
     # formerly "f_pred_prob" and "f_pred"
-    compute_sample_classification_probability = theano.function([x, masks], sample_prediction,
+    compute_sequence_class_probabilities = theano.function([x, masks], sequence_class_prediction,
                                                              name='prediction_probability_function')
-    classify_sequence = theano.function([x, masks], sample_prediction.argmax(axis=1),
+    classify_sequence = theano.function([x, masks], sequence_class_prediction.argmax(axis=1),
                                                  name='prediction_function')
 
     # formerly "out_proj_all"
     timestep_embedding_outputs = \
-        tensor.dot(timestep_projections_masked, model.globals.classifier_weights) + \
-        model.globals.classifier_bias
+        tensor.dot(timestep_projections_masked, parameters.globals.classifier_weights) + \
+        parameters.globals.classifier_bias
 
     # formerly "pred_all"
     timestep_predictions, updates = theano.scan(lambda proj: tensor.nnet.softmax(proj),
@@ -202,26 +202,26 @@ def build_network(model, use_dropout=True, weighted_cost=False, random_seed=2016
                      input_gate_sate,
                      forget_gate_state,
                      output_gate_state,
-                     model.lstm.input_weights,
-                     model.lstm.hidden_weights,
-                     model.lstm.bias,
-                     model.globals.classifier_weights,
-                     model.globals.classifier_bias,
-                     model.globals.embedding_weights]  # 10 in total
+                     parameters.lstm.input_weights,
+                     parameters.lstm.hidden_weights,
+                     parameters.lstm.bias,
+                     parameters.globals.classifier_weights,
+                     parameters.globals.classifier_bias,
+                     parameters.globals.embedding_weights]  # 10 in total
 
     get_network_state = theano.function([x, masks], network_state, name='hidden_status')
 
     off = 1e-8
-    if sample_prediction.dtype == 'float16':
+    if sequence_class_prediction.dtype == 'float16':
         off = 1e-6
 
     if weighted_cost:
         cost_weights = tensor.vector('w', dtype=config.floatX)
-        cost = -tensor.log(
-            tensor.dot(sample_prediction[tensor.arange(n_samples_in_batch), y], cost_weights) + off).mean()
+        compute_loss = -tensor.log(
+            tensor.dot(sequence_class_prediction[tensor.arange(n_samples_in_batch), y], cost_weights) + off).mean()
     else:
         cost_weights = None
-        cost = -tensor.log(sample_prediction[tensor.arange(n_samples_in_batch), y] + off).mean()
+        compute_loss = -tensor.log(sequence_class_prediction[tensor.arange(n_samples_in_batch), y] + off).mean()
 
-    return noise_bool_flag, x, masks, cost_weights, y, compute_sample_classification_probability, \
-           classify_sequence, cost, classify_timestep, get_network_state
+    return noise_flag, x, masks, cost_weights, y, compute_sequence_class_probabilities, \
+           classify_sequence, compute_loss, classify_timestep, get_network_state

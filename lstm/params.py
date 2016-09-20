@@ -34,7 +34,7 @@ def generate_random_orthogonal_vectors(size):
 
 class Parameters(object):
     class Globals(object):
-        embedding_weights_literal = "embedding_layer_weights"
+        embedding_weights_literal = "embedding_weights"
         classifier_weights_literal = "classifier_weights"
         classifier_bias_literal = "classifier_bias"
 
@@ -63,9 +63,9 @@ class Parameters(object):
             self.classifier_bias = theano.shared(archive[self.classifier_bias_literal], self.classifier_bias_literal)
 
     class LSTM(object):
-        input_weights_literal = "lstm_input_weights"
-        hidden_weights_literal = "lstm_hidden_weights"
-        bias_literal = "lstm_bias"
+        input_weights_literal = "input_weights"
+        hidden_weights_literal = "hidden_weights"
+        bias_literal = "bias"
 
         def __init__(self, hidden_unit_count=None, archive=None):
             if archive is None and hidden_unit_count is None:
@@ -108,7 +108,7 @@ class Parameters(object):
             self.lstm = Parameters.LSTM(hidden_unit_count)
         else:
             self.globals = Parameters.Globals(archive=archive)
-            self.lstm = Parameters.Globals(archive=archive)
+            self.lstm = Parameters.LSTM(archive=archive)
             # infer basic settings from globals
             self.hidden_unit_count = self.globals.classifier_bias.shape[0]
             self.feature_count = self.globals.embedding_weights.shape[0]

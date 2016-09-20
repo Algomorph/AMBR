@@ -30,7 +30,8 @@ class Arguments(Enum):
 
     display_interval = Argument(default=50, arg_type=int,
                                 arg_help="Interval (in updates) between re-printing progress to stdout.")
-    decay_c = Argument(default=0., arg_type=float, arg_help="Weight decay for the classifier applied to the U weights.")
+    decay_constant = Argument(default=0., arg_type=float,
+                              arg_help="Weight decay for the classifier applied to the U weights.")
     learning_rate = Argument(default=0.0001, arg_type=float,
                              arg_help="Learning rate for sgd (not used for adadelta and rmsprop)")
     # TODO: feature count should be inferred from the input file

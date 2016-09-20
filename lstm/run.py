@@ -30,7 +30,7 @@ from lstm.optimizer import get_optimizer_constructor
 from lstm.arguments import Arguments
 from lstm.params import Parameters, Parameters
 from lstm.network_construction import build_network
-from lstm.data_ambr import load_data, prepare_data
+from lstm.data_io import load_data, prepare_data
 from ext_argparse.argproc import process_arguments
 
 mpl.rcParams['image.interpolation'] = 'nearest'
@@ -71,35 +71,39 @@ def get_minibatch_indices(dataset_length, minibatch_size, shuffle=False):
 
     # enumerate minibatch_index_sets,
     # returns a list of tuples in the form (<index_of_minibatch>, <minibatch_index_set>)
-    return list(zip(list(range(len(minibatch_index_sets))), minibatch_index_sets))
+    return minibatch_index_sets
 
 
-def grad_array(tgrad):
-    return [np.asarray(g) for g in tgrad]
+def theano_to_numpy_grad_array(theano_gradients):
+    return [np.asarray(g) for g in theano_gradients]
 
 
-def compute_prediction_error(f_pred, data, iterator, show_hs=False, hs_func=None):
+def compute_prediction_error(classify_sequence, data, index_sets, draw_histogram_function=None):
     """
-    Just compute the error
-    f_pred: Theano fct computing the prediction
+    Compute the prediction error.
+    :param draw_histogram_function:
+    :param index_sets:
+    :type classify_sequence: theano.compile.function_module.Function
+    :param classify_sequence: Theano function for computing the prediction
+    :type data: lstm.data_io.SequenceDataset
+    :param data: the dataset for which to get classification error consistent of sequences and their labels
     prepare_data: usual prepare_data for that dataset.
     """
-    valid_err = 0
-    for _, valid_index in iterator:
-        x, mask, y = prepare_data([data[0][t] for t in valid_index],
-                                  np.array(data[1])[valid_index])
-        preds = f_pred(x, mask)
-        targets = np.array(data[1])[valid_index]
-        valid_err += (preds == targets).sum()
+    error = 0
+    for index_set in index_sets:
+        batch_features, mask, batch_labels = prepare_data([data.features[t] for t in index_set],
+                                                          np.array(data.labels)[index_set])
+        sequence_classifications = classify_sequence(batch_features, mask)
+        target_labels = np.array(data.labels)[index_set]
+        error += (sequence_classifications == target_labels).sum()
 
-    valid_err = 1. - to_numpy_theano_float(valid_err) / len(data[0])
+    error = 1. - to_numpy_theano_float(error) / len(data)
 
-    if show_hs and not hs_func is None:
-
-        x = data[0][0][:, None, :].astype('float32')
-        mask = np.ones((x.shape[0], 1), dtype='float32')
+    if draw_histogram_function is not None:
+        batch_features = data.features[:, None, :].astype('float32')
+        mask = np.ones((batch_features.shape[0], 1), dtype='float32')
         # h, c, i, f, o
-        hs = hs_func(x, mask)
+        hs = draw_histogram_function(batch_features, mask)
         plt.figure(1)
         plt.clf()
         for s in range(5):
@@ -139,54 +143,53 @@ def compute_prediction_error(f_pred, data, iterator, show_hs=False, hs_func=None
 
         time.sleep(0.1)
 
-    return valid_err
+    return error
 
 
-def pred_avg_PrRc(f_pred_prob, data, iterator, category_count, verbose=False):
-    n_samples = len(data[0])
-    probabilities = np.zeros((n_samples, category_count)).astype(config.floatX)
-    gts = np.zeros((n_samples,)).astype('int32')
+def compute_prediction_precision_and_recall(compute_sequence_class_probabilities, sequence_dataset,
+                                            batch_index_sets, category_count, verbose=False):
+    n_samples = len(sequence_dataset)
+    category_probabilities = np.zeros((n_samples, category_count)).astype(config.floatX)
+    true_labels = np.zeros((n_samples,)).astype('int32')
 
-    n_done = 0
+    for batch_index_set in batch_index_sets:
+        x, mask, y = prepare_data([sequence_dataset.features[t] for t in batch_index_set],
+                                  np.array(sequence_dataset.labels)[batch_index_set])
+        print(x.shape, mask.shape, y.shape)
+        minibatch_category_probabilities = compute_sequence_class_probabilities(x, mask)
+        category_probabilities[batch_index_set, :] = minibatch_category_probabilities
+        true_labels[batch_index_set] = np.array(sequence_dataset.labels)[batch_index_set]
 
-    for _, index_set in iterator:
-        x, mask, y = prepare_data([data[0][t] for t in index_set],
-                                  np.array(data[1])[index_set])
-        pred_probs = f_pred_prob(x, mask)
-        probabilities[index_set, :] = pred_probs
-        gts[index_set] = np.array(data[1])[index_set]
+    predicted_labels = np.argmax(category_probabilities, axis=1)
+    confusion_matrix = calculate_confusion_matrix(true_labels, predicted_labels, category_count)
+    correct_predictions = np.diagonal(confusion_matrix)
+    samples_per_class = np.sum(confusion_matrix, axis=0)
+    false_positives = np.sum(confusion_matrix, axis=1) - correct_predictions
+    false_negatives = samples_per_class - correct_predictions
 
-        n_done += len(index_set)
+    prectmp = correct_predictions / (correct_predictions + false_positives)
+    prectmp[np.where(correct_predictions == 0)[0]] = 0
+    prectmp[np.where(samples_per_class == 0)[0]] = float('nan')
+    precision = np.nanmean(prectmp)
 
-    preds = np.argmax(probabilities, axis=1)
-    cm = confusion_matrix(gts, preds, category_count)
-    tp = np.diagonal(cm)
-    cls_count = np.sum(cm, axis=0)
-    fp = np.sum(cm, axis=1) - tp
-    fn = cls_count - tp
+    rectmp = correct_predictions / (correct_predictions + false_negatives)
+    rectmp[np.where(correct_predictions == 0)[0]] = 0
+    rectmp[np.where(samples_per_class == 0)[0]] = float('nan')
+    recall = np.nanmean(rectmp)
 
-    prectmp = tp / (tp + fp)
-    prectmp[np.where(tp == 0)[0]] = 0
-    prectmp[np.where(cls_count == 0)[0]] = float('nan')
-    prec = np.nanmean(prectmp)
-
-    rectmp = tp / (tp + fn)
-    rectmp[np.where(tp == 0)[0]] = 0
-    rectmp[np.where(cls_count == 0)[0]] = float('nan')
-    rec = np.nanmean(rectmp)
-
-    return probabilities, gts, prec, rec
+    return category_probabilities, true_labels, precision, recall
 
 
 def test_lstm(model_output_path, args, result_dir=None):
     args.model_file = model_output_path
-    print("model options", args)
-    print('Loading test data')
-    train, valid, test, n_categories = load_data(args.datasets, args.folder)
+    print("Model options: ", args)
+    print("Loading test data...")
+    training_data, validation_data, test_data, n_categories = load_data(args.datasets, args.folder)
 
-    print("%d training samples" % len(train[0]))
-    print("%d validation samples" % len(valid[0]))
-    print("%d test samples" % len(test[0]))
+    print("Sample counts:")
+    print("%d training samples" % len(training_data))
+    print("%d validation samples" % len(validation_data))
+    print("%d test samples" % len(test_data))
 
     if not result_dir:
         result_dir = 'test_results9'
@@ -195,19 +198,20 @@ def test_lstm(model_output_path, args, result_dir=None):
         os.mkdir(result_dir)
 
     args.validation_batch_size = 1
-    non_theano_model = Parameters(archive=np.load(model_output_path))
-    model = Parameters(non_theano_model)
-    (use_noise, x, mask, w, y, f_pred_prob,
-     f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model,
-                                                                   hidden_unit_count=args.hidden_unit_count)
+    parameters = Parameters(archive=np.load(model_output_path))
+    (use_noise, x, mask, w, y, compute_sequence_class_probabilities,
+     f_pred, cost, f_pred_prob_all, hidden_status) = build_network(parameters, use_dropout=args.use_dropout,
+                                                                   weighted_cost=args.weighted)
 
-    kf_test = get_minibatch_indices(len(test[0]), args.validation_batch_size)
-    print("%d test examples" % len(test[0]))
+    test_minibatch_index_sets = get_minibatch_indices(len(test_data), args.validation_batch_size)
+    print("%d test examples" % len(test_data))
 
-    probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, test, kf_test, args.category_count,
-                                          verbose=False)
-    preds_all = np.argmax(probs, axis=1)
-    cm = confusion_matrix(gts, preds_all, category_count=args.category_count)
+    class_probabilities, gts, prec, rec = compute_prediction_precision_and_recall(compute_sequence_class_probabilities,
+                                                                                  test_data,
+                                                                                  test_minibatch_index_sets,
+                                                                                  args.category_count, verbose=False)
+    predicted_labels = np.argmax(class_probabilities, axis=1)
+    cm = calculate_confusion_matrix(gts, predicted_labels, category_count=args.category_count)
     cm = np.asarray(cm, 'float32')
     cm = cm / np.sum(cm, axis=0)
     cm[np.where(np.isnan(cm))] = 0
@@ -218,23 +222,23 @@ def test_lstm(model_output_path, args, result_dir=None):
     f.colorbar(im)
     plt.savefig("%s/confusion_matrix_sub.png" % result_dir)
 
-    results = {'scores': probs,
+    results = {'scores': class_probabilities,
                'gts': gts,
                'prec': prec,
                'rec': rec}
     result_file = '%s/%s_result.mat' % (result_dir, model_output_path.split('/')[-1].split('.')[0])
     sio.savemat(result_file, results)
 
-    preds_all = []
-    for t in range(len(test[0])):
-        x, mask, y = prepare_data([test[0][t]], np.array(test[1])[t])
-        preds_all.append(f_pred_prob_all(x, mask))
+    predicted_labels = []
+    for t in range(len(test_data[0])):
+        x, mask, y = prepare_data([test_data[0][t]], np.array(test_data[1])[t])
+        predicted_labels.append(f_pred_prob_all(x, mask))
 
-    results_all = {'preds_all': preds_all,
+    results_all = {'preds_all': predicted_labels,
                    'gts': gts,
-                   'start_frame': [d['s_fid'] for d in test[2]],
-                   'end_frame': [d['e_fid'] for d in test[2]],
-                   'label': [d['label'] for d in test[2]]}
+                   'start_frame': [d['s_fid'] for d in test_data[2]],
+                   'end_frame': [d['e_fid'] for d in test_data[2]],
+                   'label': [d['label'] for d in test_data[2]]}
 
     results_all_file = '%s/%s_result_all.mat' % (result_dir, model_output_path.split('/')[-1].split('.')[0])
     sio.savemat(results_all_file, results_all)
@@ -245,63 +249,63 @@ def train_lstm(model_output_path, args, check_gradients=False):
     random_seed = 2016
     np.random.seed(random_seed)
     args.model_file = model_output_path
-    print("model options", args)
-    save_interval = args.save_interval
+    print("Model options: ", args)
 
+    save_interval = args.save_interval
     build_optimizer = get_optimizer_constructor(args.optimizer)
 
-    print('Loading data')
-    train, valid, test, n_categories = load_data(args.datasets, args.folder)
-    print("%d training examples" % len(train[0]))
-    print("%d validation examples" % len(valid[0]))
-    print("%d testing examples" % len(test[0]))
+    print('Loading data...')
+    print('Sample counts:')
+    training_dataset, validation_dataset, test_dataset, n_categories = load_data(args.datasets, args.folder)
+    print("%d training samples" % len(training_dataset))
+    print("%d validation samples" % len(validation_dataset))
+    print("%d testing samples" % len(test_dataset))
 
     print('Initializing the model...')
 
     # This create the initial parameters as np ndarrays.
     # This will create Theano Shared Variables from the model parameters.
     if args.reload_model:
-        model = Parameters(archive=model_output_path)
+        parameters = Parameters(archive=model_output_path)
     else:
-        model = Parameters(args.feature_count, args.hidden_unit_count, args.category_count)
+        parameters = Parameters(args.feature_count, args.hidden_unit_count, args.category_count)
 
     print('Building the network...')
     # use_noise is for dropout
-    (use_noise_flag, x, mask, w,
-     y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model, use_dropout=args.use_dropout,
-                                                                                   weighted_cost=args.weighted,
-                                                                                   random_seed=random_seed)
+    (use_noise_flag, batch_features, mask, w, batch_labels, compute_sequence_class_probabilities, classify_sequence,
+     compute_loss, f_pred_prob_all, hidden_status) = build_network(parameters, use_dropout=args.use_dropout,
+                                                                   weighted_cost=args.weighted, random_seed=random_seed)
 
     # TODO: figure out what is this weight decay, simply L2 regularization? Then decay_c is regularization constant?
-    if args.decay_c > 0.:
-        decay_c = theano.shared(to_numpy_theano_float(args.decay_c), name='decay_c')
+    if args.decay_constant > 0.:
+        decay_constant = theano.shared(to_numpy_theano_float(args.decay_constant), name='decay_c')
         weight_decay = 0.
-        weight_decay += (model.globals.classifier_weights ** 2).sum()
-        weight_decay *= decay_c
-        cost += weight_decay
+        weight_decay += (parameters.globals.classifier_weights ** 2).sum()
+        weight_decay *= decay_constant
+        compute_loss += weight_decay
 
     if args.weighted:
-        inputs = [x, mask, y, w]
+        inputs = [batch_features, mask, batch_labels, w]
     else:
-        inputs = [x, mask, y]
+        inputs = [batch_features, mask, batch_labels]
 
-    grads = tensor.grad(cost, wrt=list(model.values()))
+    grads = tensor.grad(compute_loss, wrt=list(parameters.values()))
     f_grad = theano.function(inputs, grads, name='f_grad')
 
     lr = tensor.scalar(name='lr')
-    f_grad_shared, f_update = build_optimizer(lr, model, grads,
-                                              x, mask, y, cost, w)
+    f_grad_shared, f_update = build_optimizer(lr, parameters, grads,
+                                              batch_features, mask, batch_labels, compute_loss, w)
 
     print('Training the model...')
 
-    kf_valid = get_minibatch_indices(len(valid[0]), args.validation_batch_size)
-    kf_test = get_minibatch_indices(len(test[0]), args.validation_batch_size)
+    validation_minibatch_indices = get_minibatch_indices(len(validation_dataset), args.validation_batch_size)
+    test_minibatch_indices = get_minibatch_indices(len(test_dataset), args.validation_batch_size)
 
-    history_errs = []
-    eidx_a = []
+    error_history = []
+    epoch_index_aggregate = []
 
     if save_interval == -1:
-        save_interval = len(train[0]) / args.batch_size
+        save_interval = len(training_dataset) / args.batch_size
 
     current_update_index = 0
     early_stop = False
@@ -311,82 +315,87 @@ def train_lstm(model_output_path, args, check_gradients=False):
             n_samples = 0
 
             # Get new shuffled index for the training set.
-            minibatch_indices = get_minibatch_indices(len(train[0]), args.batch_size, shuffle=True)
+            train_minibatch_indices = get_minibatch_indices(len(training_dataset), args.batch_size, shuffle=True)
 
-            for _, train_index in minibatch_indices:
+            # traverse all the mini-batches
+            for training_minibatch_indices in train_minibatch_indices:
                 use_noise_flag.set_value(1.)
 
-                # Select the random examples for this minibatch
-                y = [train[1][t] for t in train_index]
-                x = [train[0][t] for t in train_index]
+                # Select the random sequences for this minibatch
+                batch_features = [training_dataset.features[t] for t in training_minibatch_indices]
+                batch_labels = [training_dataset.labels[t] for t in training_minibatch_indices]
 
                 # Get the data in np.ndarray format
-                # This swap the axis!
-                # Return something of shape (minibatch maxlen, n samples)
-                x, mask, y = prepare_data(x, y)
+                # Swaps the axes!
+                # Returns a matrix of shape (minibatch max. len., n samples)
+                batch_features, mask, batch_labels = prepare_data(batch_features, batch_labels)
                 if args.weighted:
-                    w = [train[3][t] for t in train_index]
-                    inputs = [x, mask, y, w]
+                    w = [training_dataset.weights[t] for t in training_minibatch_indices]
+                    inputs = [batch_features, mask, batch_labels, w]
                 else:
-                    inputs = [x, mask, y]
+                    inputs = [batch_features, mask, batch_labels]
 
-                n_samples += x.shape[1]
+                n_samples += batch_features.shape[1]
 
                 # # Check gradients
                 if check_gradients:
                     grads = f_grad(*inputs)
-                    grads_value = grad_array(grads)
+                    grads_value = theano_to_numpy_grad_array(grads)
                     print('gradients :', [np.mean(g) for g in grads_value])
-                    print('parameters :', [np.mean(vv) for kk, vv in model.as_dict().items()])
+                    print('parameters :', [np.mean(vv) for kk, vv in parameters.as_dict().items()])
 
-                cost = f_grad_shared(*inputs)
+                compute_loss = f_grad_shared(*inputs)
                 f_update(args.learning_rate)
 
-                if np.isnan(cost) or np.isinf(cost):
-                    if np.isinf(cost):
-                        raise ValueError("Inf dectected in cost. Aborting.")
-                    else:
-                        raise ValueError("NaN dectected in cost. Aborting.")
+                if np.isinf(compute_loss):
+                    raise ValueError("Inf dectected in cost. Aborting.")
+                elif np.isnan(compute_loss):
+                    raise ValueError("NaN dectected in cost. Aborting.")
 
                 if current_update_index % args.display_interval == 0:
-                    print('Epoch ', epoch_index, 'Update ', current_update_index, 'Cost ', cost)
+                    print('Epoch ', epoch_index, 'Update ', current_update_index, 'Cost ', compute_loss)
 
-                if model_output_path and current_update_index % save_interval == 0:
+                if model_output_path and (current_update_index + 1) % save_interval == 0:
                     print('Saving...', end=' ')
-                    model.save_to_numpy_archive(model_output_path)
+                    parameters.save_to_numpy_archive(model_output_path)
                     print('Done')
 
-                if current_update_index % args.validation_interval == 0:
+                if (current_update_index + 1) % args.validation_interval == 0:
                     use_noise_flag.set_value(0.)
-                    train_err = compute_prediction_error(f_pred, train, minibatch_indices)
-                    valid_err = compute_prediction_error(f_pred, valid, kf_valid)
-                    test_err = compute_prediction_error(f_pred, test, kf_test)
+                    training_error = compute_prediction_error(classify_sequence, training_dataset,
+                                                              train_minibatch_indices)
+                    validation_error = compute_prediction_error(classify_sequence, validation_dataset,
+                                                                validation_minibatch_indices)
+                    test_error = compute_prediction_error(classify_sequence, test_dataset, test_minibatch_indices)
 
-                    history_errs.append([train_err, valid_err, test_err])
-                    eidx_a.append([epoch_index, epoch_index, epoch_index])
+                    error_history.append([training_error, validation_error, test_error])
+                    epoch_index_aggregate.append([epoch_index, epoch_index, epoch_index])
 
                     plt.figure(1)
                     plt.clf()
-                    lines = plt.plot(np.array(eidx_a), np.array(history_errs))
+                    lines = plt.plot(np.array(epoch_index_aggregate), np.array(error_history))
                     plt.legend(lines, ['train', 'valid', 'test'])
                     plt.savefig("err.png")
                     time.sleep(0.1)
 
-                    if current_update_index == 0 or valid_err <= np.array(history_errs)[:, 1].min():
-                        best_parameters = model.as_dict()
+                    if current_update_index == 0 or validation_error <= np.array(error_history)[:, 1].min():
+                        best_parameters = parameters.as_dict()
                         bad_counter = 0
-                        if valid_err < np.array(history_errs)[:, 1].min():
+                        if validation_error < np.array(error_history)[:, 1].min():
                             print('  New best validation results.')
 
-                    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err))
+                    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f'
+                          % (training_error, validation_error, test_error))
 
-                    if (len(history_errs) > args.patience and valid_err >= np.array(history_errs)[:-args.patience,
-                                                                           1].min()):
+                    if (len(error_history) > args.patience
+                        and validation_error >= np.array(error_history)[:-args.patience, 1].min()):
                         bad_counter += 1
                         if bad_counter > args.patience:
-                            print('Early Stop!')
+                            print('Early stop: validation error exceeded the minimum error ' +
+                                  'in the last few epochs too many times!')
                             early_stop = True
                             break
+
                 current_update_index += 1
 
             print('Seen %d samples' % n_samples)
@@ -399,51 +408,37 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     end_time = time.time()
     if best_parameters is None:
-        best_parameters = model.as_dict()
+        best_parameters = parameters.as_dict()
 
     use_noise_flag.set_value(0.)
-    kf_train_sorted = get_minibatch_indices(len(train[0]), args.batch_size)
-    train_err = compute_prediction_error(f_pred, train, kf_train_sorted)
-    valid_err = compute_prediction_error(f_pred, valid, kf_valid)
-    test_err = compute_prediction_error(f_pred, test, kf_test)
+    sorted_train_minibatch_index_sets = get_minibatch_indices(len(training_dataset), args.batch_size)
+    training_error = compute_prediction_error(classify_sequence, training_dataset, sorted_train_minibatch_index_sets)
+    validation_error = compute_prediction_error(classify_sequence, validation_dataset, validation_minibatch_indices)
+    test_error = compute_prediction_error(classify_sequence, test_dataset, test_minibatch_indices)
 
-    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (train_err, valid_err, test_err))
+    print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (training_error, validation_error, test_error))
     if model_output_path:
-        np.savez(model_output_path, train_err=train_err,
-                 valid_err=valid_err, test_err=test_err,
-                 history_errs=history_errs, **best_parameters)
+        np.savez(model_output_path, train_err=training_error,
+                 valid_err=validation_error, test_err=test_error,
+                 history_errs=error_history, **best_parameters)
     print('The code run for %d epochs, with %f sec/epochs' % (
         (epoch_index + 1), (end_time - start_time) / (1. * (epoch_index + 1))))
     print(('Training took %.1fs' %
            (end_time - start_time)), file=sys.stderr)
-    return train_err, valid_err, test_err
+    return training_error, validation_error, test_error
 
 
-def confusion_matrix(gt, pred, category_count):
-    cm = np.zeros((category_count, category_count))
+def calculate_confusion_matrix(true_labels, predicted_labels, category_count):
+    confusion_matrix = np.zeros((category_count, category_count))
     for i in range(category_count):
-        idx_category = np.where(gt == i)[0]
+        idx_category = np.where(true_labels == i)[0]
         if idx_category.size == 0:
             continue
-        predicted_category = pred[idx_category]
+        predicted_category = predicted_labels[idx_category]
         for j in range(category_count):
-            cm[j, i] = np.where(predicted_category == j)[0].shape[0]
+            confusion_matrix[j, i] = np.where(predicted_category == j)[0].shape[0]
 
-    return cm
-
-
-def test_confusion_matrix():
-    from random import randint
-    nCls = 10
-    gt = np.tile(np.arange(nCls), (7, 1))
-    gt = np.reshape(gt.T, (gt.size,))
-    pred = np.asarray([randint(0, nCls - 1) for x in range(gt.size)])
-    cm = confusion_matrix(gt, pred, nCls)
-
-    # print cm
-    print(np.sum(cm, axis=0))
-    print(np.sum(cm, axis=1))
-    return cm
+    return confusion_matrix
 
 
 def main():
