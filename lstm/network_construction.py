@@ -161,10 +161,9 @@ def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed
     timestep_projections_masked = timestep_projections_unmasked * masks[:, :, None]
 
     # apply linear weight gradient
-    # latter time steps influence the overall sample decision more heavily?
+    # later time step results will influence the overall sequence decision more heavily
     timestep_projections_weighted = timestep_projections_masked * weight_gradient[:, :, None]
-    sample_projection = timestep_projections_weighted.sum(axis=0)
-    sample_projection = sample_projection / masks.sum(axis=0)[:, None]
+    sample_projection = timestep_projections_weighted.sum(axis=0) / masks.sum(axis=0)[:, None]
 
     # deal with dropout
     noise_flag = theano.shared(numpy_float_x(0.))
@@ -177,8 +176,10 @@ def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed
                    parameters.globals.classifier_weights) + parameters.globals.classifier_bias)
 
     # formerly "f_pred_prob" and "f_pred"
+
     compute_sequence_class_probabilities = theano.function([x, masks], sequence_class_prediction,
-                                                             name='prediction_probability_function')
+                                                             name='class_probability_function')
+
     classify_sequence = theano.function([x, masks], sequence_class_prediction.argmax(axis=1),
                                                  name='prediction_function')
 

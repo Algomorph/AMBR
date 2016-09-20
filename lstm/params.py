@@ -45,13 +45,13 @@ class Parameters(object):
                     " object needs all other constructor arguments to be integers.")
             if archive is None:
                 self.embedding_weights = theano.shared(
-                    (0.01 * np.random.rand(feature_count, hidden_unit_count)).astype(config.floatX),  # formerly Wemb
+                    (0.01 * np.random.rand(feature_count, hidden_unit_count)).astype(config.floatX),  # formerly 'Wemb'
                     self.embedding_weights_literal)
                 self.classifier_weights = theano.shared(
                     0.01 * np.random.randn(hidden_unit_count, category_count).astype(config.floatX),
-                    self.classifier_weights_literal)  # formerly U
+                    self.classifier_weights_literal)  # formerly 'U'
                 self.classifier_bias = theano.shared(np.zeros((category_count,)).astype(config.floatX),
-                                                     self.classifier_bias_literal)  # formerly b
+                                                     self.classifier_bias_literal)  # formerly 'b'
             else:
                 self.read_values_from_dict(archive)
 
@@ -110,9 +110,9 @@ class Parameters(object):
             self.globals = Parameters.Globals(archive=archive)
             self.lstm = Parameters.LSTM(archive=archive)
             # infer basic settings from globals
-            self.hidden_unit_count = self.globals.classifier_bias.shape[0]
-            self.feature_count = self.globals.embedding_weights.shape[0]
-            self.category_count = self.globals.classifier_weights.shape[1]
+            self.hidden_unit_count = self.globals.classifier_weights.get_value().shape[0]
+            self.feature_count = self.globals.embedding_weights.get_value().shape[0]
+            self.category_count = self.globals.classifier_weights.get_value().shape[1]
         self.parameter_dict = {}
         self.__update_dict()
 

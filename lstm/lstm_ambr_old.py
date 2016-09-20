@@ -250,7 +250,6 @@ def build_model(tparams, args):
         proj = dropout_layer(proj, use_noise, trng)
 
     pred = tensor.nnet.softmax(tensor.dot(proj, tparams['U']) + tparams['b'])
-
     f_pred_prob = theano.function([x, mask], pred, name='f_pred_prob')
     f_pred = theano.function([x, mask], pred.argmax(axis=1), name='f_pred')
 
@@ -290,13 +289,13 @@ def pred_error(f_pred, prepare_data, data, iterator, verbose=False, show_hs=Fals
     """
     valid_err = 0
     for _, valid_index in iterator:
-        x, mask, y = prepare_data([data[0][t] for t in valid_index],
-                                  np.array(data[1])[valid_index])
+        x, mask, y = prepare_data([data.features[t] for t in valid_index],
+                                  np.array(data.labels)[valid_index])
         preds = f_pred(x, mask)
-        targets = np.array(data[1])[valid_index]
+        targets = np.array(data.labels)[valid_index]
         valid_err += (preds == targets).sum()
 
-    valid_err = 1. - numpy_floatX(valid_err) / len(data[0])
+    valid_err = 1. - numpy_floatX(valid_err) / len(data)
 
     if show_hs and not hs_func is None:
         # x = data[0][0][:,None,:].astype('float32')
@@ -354,18 +353,18 @@ def pred_error(f_pred, prepare_data, data, iterator, verbose=False, show_hs=Fals
 
 
 def pred_avg_PrRc(f_pred_prob, prepare_data, data, iterator, category_count, verbose=False):
-    n_samples = len(data[0])
+    n_samples = len(data)
     probabilities = np.zeros((n_samples, category_count)).astype(config.floatX)
     gts = np.zeros((n_samples,)).astype('int32')
 
     n_done = 0
 
     for _, valid_index in iterator:
-        x, mask, y = prepare_data([data[0][t] for t in valid_index],
-                                  np.array(data[1])[valid_index])
+        x, mask, y = prepare_data([data.features[t] for t in valid_index],
+                                  np.array(data.labels)[valid_index])
         pred_probs = f_pred_prob(x, mask)
         probabilities[valid_index, :] = pred_probs
-        gts[valid_index] = np.array(data[1])[valid_index]
+        gts[valid_index] = np.array(data.labels)[valid_index]
 
         n_done += len(valid_index)
 
@@ -393,11 +392,11 @@ def test_lstm(model_file_path, args, result_dir=None):
     args.model_file = model_file_path
     print("model options", args)
     print('Loading test data')
-    train, valid, test, n_categories = load_data()
+    train, valid, test, n_categories = load_data(args.datasets, args.folder)
 
-    print("%d train examples" % len(train[0]))
-    print("%d valid examples" % len(valid[0]))
-    print("%d test examples" % len(test[0]))
+    print("%d train examples" % len(train))
+    print("%d valid examples" % len(valid))
+    print("%d test examples" % len(test))
 
     if not result_dir:
         result_dir = 'test_results9'
@@ -412,8 +411,8 @@ def test_lstm(model_file_path, args, result_dir=None):
     (use_noise, x, mask,
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_model(tparams, args)
 
-    kf_test = get_minibatches_idx(len(test[0]), args.validation_batch_size)
-    print("%d test examples" % len(test[0]))
+    kf_test = get_minibatches_idx(len(test), args.validation_batch_size)
+    print("%d test examples" % len(test))
 
     probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, prepare_data, test, kf_test, args.category_count,
                                           verbose=False)
@@ -437,15 +436,15 @@ def test_lstm(model_file_path, args, result_dir=None):
     sio.savemat(result_file, results)
 
     preds_all = []
-    for t in range(len(test[0])):
-        x, mask, y = prepare_data([test[0][t]], np.array(test[1])[t])
+    for t in range(len(test)):
+        x, mask, y = prepare_data([test.features[t]], np.array(test.labels)[t])
         preds_all.append(f_pred_prob_all(x, mask))
 
     results_all = {'preds_all': preds_all,
                    'gts': gts,
-                   'start_frame': [d['s_fid'] for d in test[2]],
-                   'end_frame': [d['e_fid'] for d in test[2]],
-                   'label': [d['label'] for d in test[2]]}
+                   'start_frame': [d['start'] for d in test.meta_information],
+                   'end_frame': [d['end'] for d in test.meta_information],
+                   'label': [d['label'] for d in test.meta_information]}
 
     results_all_file = '%s/%s_result_all.mat' % (result_dir, model_file_path.split('/')[-1].split('.')[0])
     sio.savemat(results_all_file, results_all)
@@ -471,9 +470,9 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     print('Loading data')
     train, valid, test, n_categories = load_data(args.datasets, args.folder)
-    print("%d train examples" % len(train[0]))
-    print("%d valid examples" % len(valid[0]))
-    print("%d test examples" % len(test[0]))
+    print("%d train examples" % len(train))
+    print("%d valid examples" % len(valid))
+    print("%d test examples" % len(test))
 
     print('Building model')
     # This create the initial parameters as np ndarrays.
@@ -492,8 +491,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
     (use_noise, x, mask,
      y, f_pred_prob, f_pred, cost, f_pred_prob_all, hidden_status) = build_model(tparams, args)
 
-    if args.decay_c > 0.:
-        decay_c = theano.shared(numpy_floatX(args.decay_c), name='decay_c')
+    if args.decay_constant > 0.:
+        decay_c = theano.shared(numpy_floatX(args.decay_constant), name='decay_c')
         weight_decay = 0.
         weight_decay += (tparams['U'] ** 2).sum()
         weight_decay *= decay_c
@@ -510,8 +509,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     print('Optimization')
 
-    kf_valid = get_minibatches_idx(len(valid[0]), args.validation_batch_size)
-    kf_test = get_minibatches_idx(len(test[0]), args.validation_batch_size)
+    kf_valid = get_minibatches_idx(len(valid), args.validation_batch_size)
+    kf_test = get_minibatches_idx(len(test), args.validation_batch_size)
 
     history_errs = []
     eidx_a = []
@@ -528,16 +527,16 @@ def train_lstm(model_output_path, args, check_gradients=False):
             n_samples = 0
 
             # Get new shuffled index for the training set.
-            kf = get_minibatches_idx(len(train[0]), args.batch_size, shuffle=True)
+            kf = get_minibatches_idx(len(train), args.batch_size, shuffle=True)
 
             for _, train_index in kf:
                 uidx += 1
                 use_noise.set_value(1.)
 
                 # Select the random examples for this minibatch
-                y = [train[1][t] for t in train_index]
-                x = [train[0][t] for t in train_index]
-                w = [train[3][t] for t in train_index]
+                y = [train.labels[t] for t in train_index]
+                x = [train.features[t] for t in train_index]
+                w = [train.weights[t] for t in train_index]
 
                 # Get the data in np.ndarray format
                 # This swap the axis!
@@ -627,7 +626,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
         best_p = unzip(tparams)
 
     use_noise.set_value(0.)
-    kf_train_sorted = get_minibatches_idx(len(train[0]), args.batch_size)
+    kf_train_sorted = get_minibatches_idx(len(train.features), args.batch_size)
     train_err = pred_error(f_pred, prepare_data, train, kf_train_sorted)
     valid_err = pred_error(f_pred, prepare_data, valid, kf_valid)
     test_err = pred_error(f_pred, prepare_data, test, kf_test)

@@ -155,7 +155,6 @@ def compute_prediction_precision_and_recall(compute_sequence_class_probabilities
     for batch_index_set in batch_index_sets:
         x, mask, y = prepare_data([sequence_dataset.features[t] for t in batch_index_set],
                                   np.array(sequence_dataset.labels)[batch_index_set])
-        print(x.shape, mask.shape, y.shape)
         minibatch_category_probabilities = compute_sequence_class_probabilities(x, mask)
         category_probabilities[batch_index_set, :] = minibatch_category_probabilities
         true_labels[batch_index_set] = np.array(sequence_dataset.labels)[batch_index_set]
@@ -181,6 +180,7 @@ def compute_prediction_precision_and_recall(compute_sequence_class_probabilities
 
 
 def test_lstm(model_output_path, args, result_dir=None):
+    random_seed = 2016
     args.model_file = model_output_path
     print("Model options: ", args)
     print("Loading test data...")
@@ -201,7 +201,8 @@ def test_lstm(model_output_path, args, result_dir=None):
     parameters = Parameters(archive=np.load(model_output_path))
     (use_noise, x, mask, w, y, compute_sequence_class_probabilities,
      f_pred, cost, f_pred_prob_all, hidden_status) = build_network(parameters, use_dropout=args.use_dropout,
-                                                                   weighted_cost=args.weighted)
+                                                                   weighted_cost=args.weighted,
+                                                                   random_seed=random_seed)
 
     test_minibatch_index_sets = get_minibatch_indices(len(test_data), args.validation_batch_size)
     print("%d test examples" % len(test_data))
