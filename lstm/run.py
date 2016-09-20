@@ -51,28 +51,27 @@ def to_numpy_theano_float(data):
     return np.asarray(data, dtype=config.floatX)
 
 
-def get_minibatch_indexes(n, minibatch_size, shuffle=False):
+def get_minibatch_indices(dataset_length, minibatch_size, shuffle=False):
     """
     Used to shuffle the dataset at each iteration.
     """
 
-    idx_list = np.arange(n, dtype="int32")
+    index_list = np.arange(dataset_length, dtype="int32")
 
     if shuffle:
-        np.random.shuffle(idx_list)
+        np.random.shuffle(index_list)
 
-    minibatch = []
-    minibatch_start = 0
-    for i in range(n // minibatch_size):
-        minibatch.append(idx_list[minibatch_start:
-        minibatch_start + minibatch_size])
-        minibatch_start += minibatch_size
+    minibatch_index_sets = []
+    for minibatch_start in range(0, dataset_length, minibatch_size):
+        minibatch_index_sets.append(index_list[minibatch_start:minibatch_start + minibatch_size])
 
-    if minibatch_start != n:
+    if minibatch_start != dataset_length:
         # Make a minibatch out of what is left
-        minibatch.append(idx_list[minibatch_start:])
+        minibatch_index_sets.append(index_list[minibatch_start:])
 
-    return list(zip(list(range(len(minibatch))), minibatch))
+    # enumerate minibatch_index_sets,
+    # returns a list of tuples in the form (<index_of_minibatch>, <minibatch_index_set>)
+    return list(zip(list(range(len(minibatch_index_sets))), minibatch_index_sets))
 
 
 def grad_array(tgrad):
@@ -150,14 +149,14 @@ def pred_avg_PrRc(f_pred_prob, data, iterator, category_count, verbose=False):
 
     n_done = 0
 
-    for _, valid_index in iterator:
-        x, mask, y = prepare_data([data[0][t] for t in valid_index],
-                                  np.array(data[1])[valid_index])
+    for _, index_set in iterator:
+        x, mask, y = prepare_data([data[0][t] for t in index_set],
+                                  np.array(data[1])[index_set])
         pred_probs = f_pred_prob(x, mask)
-        probabilities[valid_index, :] = pred_probs
-        gts[valid_index] = np.array(data[1])[valid_index]
+        probabilities[index_set, :] = pred_probs
+        gts[index_set] = np.array(data[1])[index_set]
 
-        n_done += len(valid_index)
+        n_done += len(index_set)
 
     preds = np.argmax(probabilities, axis=1)
     cm = confusion_matrix(gts, preds, category_count)
@@ -202,7 +201,7 @@ def test_lstm(model_output_path, args, result_dir=None):
      f_pred, cost, f_pred_prob_all, hidden_status) = build_network(model,
                                                                    hidden_unit_count=args.hidden_unit_count)
 
-    kf_test = get_minibatch_indexes(len(test[0]), args.validation_batch_size)
+    kf_test = get_minibatch_indices(len(test[0]), args.validation_batch_size)
     print("%d test examples" % len(test[0]))
 
     probs, gts, prec, rec = pred_avg_PrRc(f_pred_prob, test, kf_test, args.category_count,
@@ -295,8 +294,8 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
     print('Training the model...')
 
-    kf_valid = get_minibatch_indexes(len(valid[0]), args.validation_batch_size)
-    kf_test = get_minibatch_indexes(len(test[0]), args.validation_batch_size)
+    kf_valid = get_minibatch_indices(len(valid[0]), args.validation_batch_size)
+    kf_test = get_minibatch_indices(len(test[0]), args.validation_batch_size)
 
     history_errs = []
     eidx_a = []
@@ -312,9 +311,9 @@ def train_lstm(model_output_path, args, check_gradients=False):
             n_samples = 0
 
             # Get new shuffled index for the training set.
-            kf = get_minibatch_indexes(len(train[0]), args.batch_size, shuffle=True)
+            minibatch_indices = get_minibatch_indices(len(train[0]), args.batch_size, shuffle=True)
 
-            for _, train_index in kf:
+            for _, train_index in minibatch_indices:
                 use_noise_flag.set_value(1.)
 
                 # Select the random examples for this minibatch
@@ -359,7 +358,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
 
                 if current_update_index % args.validation_interval == 0:
                     use_noise_flag.set_value(0.)
-                    train_err = compute_prediction_error(f_pred, train, kf)
+                    train_err = compute_prediction_error(f_pred, train, minibatch_indices)
                     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
                     test_err = compute_prediction_error(f_pred, test, kf_test)
 
@@ -403,7 +402,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
         best_parameters = model.as_dict()
 
     use_noise_flag.set_value(0.)
-    kf_train_sorted = get_minibatch_indexes(len(train[0]), args.batch_size)
+    kf_train_sorted = get_minibatch_indices(len(train[0]), args.batch_size)
     train_err = compute_prediction_error(f_pred, train, kf_train_sorted)
     valid_err = compute_prediction_error(f_pred, valid, kf_valid)
     test_err = compute_prediction_error(f_pred, test, kf_test)
