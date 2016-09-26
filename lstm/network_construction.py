@@ -175,11 +175,10 @@ def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed
         tensor.dot(sample_projection,
                    parameters.globals.classifier_weights) + parameters.globals.classifier_bias)
 
-    # formerly "f_pred_prob" and "f_pred"
-
+    # formerly "f_pred_prob"
     compute_sequence_class_probabilities = theano.function([x, masks], sequence_class_prediction,
                                                              name='class_probability_function')
-
+    # formerly "f_pred"
     classify_sequence = theano.function([x, masks], sequence_class_prediction.argmax(axis=1),
                                                  name='prediction_function')
 
@@ -195,7 +194,7 @@ def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed
                                                 n_steps=n_timesteps_in_sample)
 
     # formerly "f_pred_prob_all"
-    classify_timestep = theano.function([x, masks], timestep_predictions, name='f_pred_prob_all')
+    classify_timesteps = theano.function([x, masks], timestep_predictions, name='f_pred_prob_all')
 
     # hidden_all
     network_state = [timestep_projections_unmasked,
@@ -225,4 +224,4 @@ def build_network(parameters, use_dropout=True, weighted_cost=False, random_seed
         compute_loss = -tensor.log(sequence_class_prediction[tensor.arange(n_samples_in_batch), y] + off).mean()
 
     return noise_flag, x, masks, cost_weights, y, compute_sequence_class_probabilities, \
-           classify_sequence, compute_loss, classify_timestep, get_network_state
+           classify_sequence, compute_loss, classify_timesteps, get_network_state

@@ -86,7 +86,7 @@ class Model(object):
         # build the actual network and compile all the necessary functions for training & testing
         (self.noise_flag, self.batch_features, self.mask, self.cost_weights, self.batch_labels,
          self.compute_sequence_class_probabilities, self.classify_sequence, self.compute_loss,
-         self.classify_timestep, self.get_network_state) = \
+         self.classify_timesteps, self.get_network_state) = \
             build_network(parameters, use_dropout, weighted_loss, random_seed)
         build_optimizer = get_optimizer_constructor(optimizer_name)
 
@@ -480,12 +480,12 @@ class Model(object):
                    'precision': precision,
                    'recall': recall}
         if self.output_directory is not None:
-            np.savez_compressed(os.path.join(self.output_directory, "aggregate_test_results.npz"), **results)
+            np.savez_compressed(os.path.join(self.output_directory, "sequence_test_results.npz"), **results)
 
         predicted_labels = []
         for t in range(len(test_data)):
             x, mask, y = prepare_data([test_data.features[t]], np.array(test_data.labels)[t])
-            predicted_labels.append(self.classify_timestep(x, mask))
+            predicted_labels.append(self.classify_timesteps(x, mask))
 
         results_all = {'predicted_labels': predicted_labels,
                        'true_labels': true_labels,
@@ -493,6 +493,6 @@ class Model(object):
                        'end_frame': [d['end'] for d in test_data.meta_information],
                        'label': [d['label'] for d in test_data.meta_information]}
         if self.output_directory is not None:
-            np.savez_compressed(os.path.join(self.output_directory, "detailed_test_results.npz"), **results_all)
+            np.savez_compressed(os.path.join(self.output_directory, "timestep_test_results.npz"), **results_all)
 
-        return
+        return predicted_labels
