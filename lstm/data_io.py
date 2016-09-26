@@ -74,16 +74,13 @@ def load_data(datasets, base_work_folder):
     :type valid_portion: float
     :param valid_portion: The proportion of the full train set used for
         the validation set.
-    :rtype: (lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, int)
-    :return training, validation, and testing dataset, and the category count
+    :rtype: (lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, int, int)
+    :return training, validation, and testing dataset, the category and the feature counts
     """
 
     features_by_sample = []
     labels_by_sample = []
     meta_by_sample = []
-
-    feat_count = 0
-    feat_mean = 0
 
     for obj in datasets:
         base_data_path = os.path.join(base_work_folder, 'data')
@@ -104,9 +101,6 @@ def load_data(datasets, base_work_folder):
             sample_features = all_features[entry['start']:entry['end'] + 1, :]
             if len(sample_features) == 0:
                 raise ValueError("Got input sequence length 0: {:s}".format(str(entry)))
-
-            feat_count += all_features.shape[0]
-            feat_mean += np.sum(np.mean(all_features, axis=1))
 
             sample_label = entry['label']
 
@@ -156,4 +150,6 @@ def load_data(datasets, base_work_folder):
     validation_set = SequenceDataset(validation_set_x, validation_set_y, validation_set_meta)
     test_set = SequenceDataset(test_set_x, test_set_y, test_set_meta)
 
-    return training_set, validation_set, test_set, n_categories
+    n_features = len(test_set_x[0])
+
+    return training_set, validation_set, test_set, n_categories, n_features

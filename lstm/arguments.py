@@ -39,18 +39,14 @@ class Arguments(Enum):
     optimizer = Argument(default="adadelta", arg_type=str,
                          arg_help="sgd, adadelta and rmsprop available. Sgd very hard to use, not recommended " +
                                   "(probably need momentum and decaying learning rate).")
-    # TODO: can be removed, must be lstm.
-    encoder = Argument(default="lstm", arg_type=str, arg_help="Type of training model to use.")
     validation_interval = Argument(default=20, arg_type=int,
                                    arg_help="Interval (in updates) between re-validating to prevent overfitting.")
     save_interval = Argument(default=20, arg_type=int,
                              arg_help="Interval (in updates) between re-saving trained parameters.")
     batch_size = Argument(default=10, arg_type=int, arg_help="Batch size to use for training.")
     validation_batch_size = Argument(default=5, arg_type=int, arg_help="Batch size to use for validation/testing.")
-    # TODO: figure out & write help for this one
     noise_std = Argument(default=0., arg_type=float,
-                         arg_help="(TODO) amount of artificial noise to introduce to input data, I guess... -Greg")
-    # TODO: figure out how this works and write better help.
+                         arg_help="(TODO) amount of artificial noise to introduce to prevent overfitting.")
     use_dropout = Argument(default=False, arg_type='bool_flag', action='store_true',
                            arg_help="If False, training is slightly faster, " +
                                     "but the model yields a worse test error. " +
@@ -60,12 +56,11 @@ class Arguments(Enum):
                                     "Research 15, no. 1\n(2014): 1929-1958.")
     reload_model = Argument(default=False, arg_type='bool_flag', action='store_true',
                             arg_help="Whether or not to reload the existing model from the model file location.")
-    # TODO why is this the number of categories(squared), not just number of categories???
-    category_count = Argument(default=5, arg_type=int,
-                              arg_help="Number of categories (squared)")
     weighted = Argument(default=False, arg_type='bool_flag', action='store_true',
                         arg_help="Whether or not to weigh update cost using the inverse combined sequence" +
                                  "count ratio of each category to the total sample count.")
     overwrite_model = Argument(default=False, arg_type='bool_flag', action='store_true',
                                arg_help="Whether or not to overwrite the model at the model file location.")
+    random_seed = Argument(default=2016, arg_type=int,
+                           arg_help="Random seed to use for shuffling sample sequences and initializing weights.")
     datasets = Argument(default=["al0"], nargs='+', arg_help="data sets to process")
