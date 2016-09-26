@@ -53,7 +53,7 @@ def main():
     else:
         parameters = Parameters(n_features, args.hidden_unit_count, n_categories)
 
-    model = Model(optimizer_name=args.optimizer, model_path=model_path, parameters=parameters,
+    model = Model(optimizer_name=args.optimizer, model_output_path=model_path, parameters=parameters,
                   random_seed=args.random_seed, decay_constant=args.decay_constant)
 
     if verbose:

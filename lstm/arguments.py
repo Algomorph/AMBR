@@ -28,7 +28,7 @@ class Arguments(Enum):
                         arg_help="Number of epochs to wait before early stop if there is no training progress.")
     max_epochs = Argument(default=300, arg_type=int, arg_help="Maximum number of epochs to run.")
 
-    display_interval = Argument(default=50, arg_type=int,
+    report_interval = Argument(default=50, arg_type=int,
                                 arg_help="Interval (in updates) between re-printing progress to stdout.")
     decay_constant = Argument(default=0., arg_type=float,
                               arg_help="Weight decay for the classifier applied to the U weights.")

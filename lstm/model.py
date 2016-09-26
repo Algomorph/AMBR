@@ -84,7 +84,7 @@ class Model(object):
         self.random_seed = random_seed
 
         # build the actual network and compile all the necessary functions for training & testing
-        (self.noise_flag, self.batch_features, self.masks, self.cost_weights, self.batch_labels,
+        (self.noise_flag, self.batch_features, self.mask, self.cost_weights, self.batch_labels,
          self.compute_sequence_class_probabilities, self.classify_sequence, self.compute_loss,
          self.classify_timestep, self.get_network_state) = \
             build_network(parameters, use_dropout, weighted_loss, random_seed)
@@ -99,13 +99,13 @@ class Model(object):
 
         self.weighted_loss = weighted_loss
         if weighted_loss:
-            self.inputs = [self.batch_features, self.mask, self.batch_labels, self.cost_weights]
+            input_tensors = [self.batch_features, self.mask, self.batch_labels, self.cost_weights]
         else:
-            self.inputs = [self.batch_features, self.mask, self.batch_labels]
+            input_tensors = [self.batch_features, self.mask, self.batch_labels]
 
         # gradients of loss with respect to parameters
         gradients = tensor.grad(self.compute_loss, wrt=list(parameters.values()))
-        self.compute_gradients = theano.function(self.inputs, gradients, name='f_grad')
+        self.compute_gradients = theano.function(input_tensors, gradients, name='f_grad')
 
         learing_rate = tensor.scalar(name='learning_rate')
         self.compute_shared_gradient, self.update_parameters = build_optimizer(learing_rate, parameters, gradients,
@@ -266,7 +266,6 @@ class Model(object):
         if self.parameters is None:
             self.initialize_parameters(training_data)
 
-
         validation_batch_indices = Model.get_batch_indices(len(validation_data), validation_batch_size)
         test_batch_indices = Model.get_batch_indices(len(test_data), validation_batch_size)
 
@@ -325,7 +324,7 @@ class Model(object):
 
                     if (current_update_index + 1) % report_interval == 0:
                         if verbose:
-                            print('Epoch ', epoch_index, '; update ', current_update_index, '; loss/penalty ', loss)
+                            print('Epoch: ', epoch_index, ' | Update: ', current_update_index, '|Loss/penalty: ', loss)
 
                     if self.model_output_path is not None and (current_update_index + 1) % save_interval == 0:
                         if verbose:
@@ -348,7 +347,7 @@ class Model(object):
                         lines = plt.plot(np.array(epoch_index_aggregate), np.array(error_history))
                         plt.legend(lines, ['training error', 'validation error', 'test error'])
                         if self.output_directory:
-                            plt.savefig("error.png")
+                            plt.savefig(os.path.join(self.output_directory, "error.png"))
                         time.sleep(0.1)
 
                         # TODO: check the logic here to see if it actually works
@@ -358,15 +357,15 @@ class Model(object):
                             if validation_error < np.array(error_history)[:, 1].min() and verbose:
                                 print('  New best validation results.')
                         if verbose:
-                            print('Training error=%.06f;  validation error=%.06f; test error=%.06f' % (
+                            print("Training error=%.06f |  validation error=%.06f | test error=%.06f" % (
                                 training_error, validation_error, test_error))
 
                         if (len(error_history) > patience
                             and validation_error >= np.array(error_history)[:-patience, 1].min()):
                             bad_counter += 1
                             if bad_counter > patience:
-                                print('Early stop: validation error exceeded the minimum error ' +
-                                      'in the last few epochs too many times!')
+                                print("Early stop: validation error exceeded the minimum error " +
+                                      "in the last few epochs too many times!")
                                 early_stop = True
                                 break
                         self.noise_flag.set_value(1.)
@@ -392,10 +391,11 @@ class Model(object):
         validation_error = self.compute_prediction_error(validation_data, validation_batch_indices)
         test_error = self.compute_prediction_error(test_data, test_batch_indices)
         if verbose:
-            print('TrainErr=%.06f  ValidErr=%.06f  TestErr=%.06f' % (training_error, validation_error))
-            print('The code run for %d epochs, with %f sec/epochs' % (
+            print("Training error=%.06f |  Validation error=%.06f |  Test error=%.06f"
+                  % (training_error, validation_error, test_error))
+            print("The code run for %d epochs, with %f sec/epochs" % (
                 (epoch_index + 1), (end_time - start_time) / (1. * (epoch_index + 1))))
-            print(('Training took %.1fs' %
+            print(("Training took %.1fs" %
                    (end_time - start_time)), file=sys.stderr)
         if self.model_output_path is not None:
             np.savez(self.model_output_path, training_error=training_error, test_error=test_error,

@@ -150,6 +150,6 @@ def load_data(datasets, base_work_folder):
     validation_set = SequenceDataset(validation_set_x, validation_set_y, validation_set_meta)
     test_set = SequenceDataset(test_set_x, test_set_y, test_set_meta)
 
-    n_features = len(test_set_x[0])
+    n_features = len(test_set_x[0][0])
 
     return training_set, validation_set, test_set, n_categories, n_features

@@ -314,6 +314,7 @@ def train_lstm(model_output_path, args, check_gradients=False):
     current_update_index = 0
     early_stop = False
     start_time = time.time()
+    best_parameters = None
 
     try:
         for epoch_index in range(args.max_epochs):
