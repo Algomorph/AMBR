@@ -35,6 +35,10 @@ class Arguments(Enum):
     multiview_only = Argument(arg_help="Generate only multiview label file (assumes all " +
                                        "input files are from different views).",
                               arg_type='bool_flag', default=False, action='store_true')
+    multiview_format = Argument(arg_help="Use multiview label input file format (input arg required)",
+                                arg_type='bool_flag', default=False, action='store_true')
+    verbosity = Argument(arg_help="Verbosity level", arg_type=int, default=1)
+    global_offset = Argument(arg_help="Global offset to add to all the frame numbers.", arg_type=int, default=0)
 
 
 class Fields(object):
@@ -235,18 +239,124 @@ def calculate_view_offset_at(offset_points, timestep):
     return offset_points[-1][1]
 
 
-def main():
-    args = process_arguments(Arguments, "text label -> JSON Label Converter for LSTM")
-    verbosity = 1
-    if args.multiview_only and args.single_view_only:
-        raise ValueError("{:s} and {:s} arguments cannot be combined.".format(Arguments.single_view_only.name,
-                                                                              Arguments.multiview_only.name))
+def insert_out_of_frame_sequences(args, samples, present_flags, view_name):
+    """
+    Takes samples w/o X (not-in-frame) labels for a single view and the per-frame "present" flag array for that view
+    and generates the missing X sequence samples for those intervals whose frames are marked as "false" in the "present"
+    flag array.
+    :param args: program args
+    :param samples: array of sequence samples with no "empty/out-of-frame" (X) labels
+    :param present_flags: array of flags indicating whether the subject is present in the sequence or not
+    :param view_name: name of the current view
+    :return: processed samples array with the new X-labeled sequences
+    """
+    samples_processed = []
+    start_at = 0
+
+    for sample in samples + [generate_sample_dict(len(present_flags), 0, -99)]:
+        if sample[Fields.start] > 0:
+            begin_x_frame = start_at
+            while begin_x_frame < sample[Fields.start]:
+                if not present_flags[begin_x_frame]:
+                    end_x_frame = begin_x_frame
+                    while end_x_frame < sample[Fields.start] and not present_flags[end_x_frame]:
+                        end_x_frame += 1
+                    if end_x_frame - begin_x_frame < args.min_sequence_length:
+                        if args.verbosity >= 2:
+                            print(("WARNING: Got a suspiciously short X (out of frame) sequence,"
+                                   + " [{:d},{:d}], for source {:s}")
+                                  .format(begin_x_frame, end_x_frame - 1, view_name))
+                    else:
+                        samples_processed.append(
+                            generate_sample_dict(begin_x_frame + args.global_offset,
+                                                 end_x_frame - 1 + args.global_offset, label_mapping['X']))
+                    begin_x_frame = end_x_frame
+                begin_x_frame += 1
+            if sample[Fields.label] != -99:
+                samples_processed.append(sample)
+        start_at = sample[Fields.end] + 1
+
+    return samples_processed
+
+
+def insert_default_label_sequences(args, samples, default_behavior_label):
+    """
+    Takes sample sequence list for a single view and inserts all the missing sequences in-between, marking them
+    with "default label"
+    :param args: program args
+    :param samples: sample sequence list for a single view w/o default labels
+    :param default_behavior_label: the numeric version of the default label
+    :return: (ordered) sample list with the original sequences and the "default"-label sequences in-between them.
+    """
+    samples_processed = []
+    if args.default_label and samples[0][Fields.start] > args.min_sequence_length:
+        samples_processed.append(
+            generate_sample_dict(0 + args.global_offset, samples[0][Fields.start] - 1 + args.global_offset,
+                                 default_behavior_label))
+    for ix_sample in range(len(samples) - 1):
+        sample = samples[ix_sample]
+        next_sample = samples[ix_sample + 1]
+        samples_processed.append(sample)
+        if next_sample[Fields.start] - (sample[Fields.end] + 1) > args.min_sequence_length:
+            samples_processed.append(
+                generate_sample_dict(sample[Fields.end] + 1 + args.global_offset,
+                                     next_sample[Fields.start] - 1 + args.global_offset,
+                                     default_behavior_label))
+    sample = samples[-1]
+    samples_processed.append(sample)
+    return samples_processed
+
+
+def parse_label_lines(args, lines, multiview_mode=False):
+    x_re = re.compile(r"\[\s*out of visual field\s*\]|\[\s*out of frame\s*\]")
+    range_re = re.compile(
+        r"(\d+)\s*(?:\(\?\))?\s*-\s*(\d+)\s*(?:\(\?\))?(?::|;)?\s*(R|G|S|X)\s*?(\?)?\s*(?:\s*\+(\d+))?")
+    multiview_offset_match_re = re.compile(r"!(?:\s*\w+\s*[+-]\s*\d+,\s*)*(?:\w+\s*[+-]\s*\d+\s*)")
+    multiview_offset_parse_re = re.compile(r"\s*(\w+)\s*([+-]\s*\d+)")
+
+    samples = []
+
+    if multiview_mode:
+        offset_points = {}
+    else:
+        offset_points = [(0, 0)]
+
+    last_start = 0
+
+    # parse the label file
+    for line in lines:
+        line = x_re.sub("X", line, re.IGNORECASE)
+        match_range = range_re.match(line)
+        if match_range:
+            if match_range.group(4) is None:
+                start = int(match_range.group(1))
+                end = int(match_range.group(2))
+                label = label_mapping[match_range.group(3)]
+                if label != 0:  # drop manual X labels; we will read them from the features file
+                    samples.append(generate_sample_dict(start + args.global_offset, end + args.global_offset, label))
+            if not multiview_mode and match_range.group(5) is not None:
+                offset = int(match_range.group(5))
+                offset_points.append((start, offset))
+            last_start = start
+        elif multiview_mode and multiview_offset_match_re.match(line):
+            for view_name, offset in multiview_offset_parse_re.findall(line):
+                if view_name in offset_points:
+                    view_offset_points = offset_points[view_name]
+                else:
+                    view_offset_points = []
+                    offset_points[view_name] = view_offset_points
+                view_offset_points.append((last_start, int(offset)))
+                break
+        else:
+            print("Unmatched line: {:s}".format(line))
+    if args.verbosity >= 1:
+        print("Line count: {:d}\nSamples parsed: {:d}".format(len(lines), len(samples)))
+    return samples, offset_points
+
+
+def process_individual_label_files(args, default_behavior_label):
     input_paths = []
     view_names = []
-
-    x_re = re.compile(r"\[\s*out of visual field\s*\]|\[\s*out of frame\s*\]")
-    parse_re = re.compile(
-        r"(\d+)\s*(?:\(\?\))?\s*-\s*(\d+)\s*(?:\(\?\))?(?::|;)?\s*(R|G|S|X)\s*?(\?)?\s*(?:\s*\+(\d+))?")
 
     # determine input file paths
     default_input_file_ending = "_labels.txt"
@@ -292,7 +402,7 @@ def main():
     # process each input file one-by-one
     for input_index, (labels_path, feature_path) in enumerate(input_paths):
         input_file = args.input[input_index]
-        if verbosity > 0:
+        if args.verbosity > 0:
             print("Processing file {:s}".format(input_file))
         view_name = view_names[input_index]
         present_flags = np.load(feature_path)['present']
@@ -314,78 +424,19 @@ def main():
         lines = tuple(file_handle)
         file_handle.close()
 
-        default_behavior_label = 4
-        samples = []
+        samples, offset_points = parse_label_lines(args, lines)
 
-        offset_points = [(0, 0)]
+        # ========================= insert automatic "out of frame / X" label sequences ============================== #
+        samples = insert_out_of_frame_sequences(args, samples, present_flags, view_name)
 
-        # parse the label file
-        for line in lines:
-            line = x_re.sub("X", line, re.IGNORECASE)
-            match_range = parse_re.match(line)
-            if match_range:
-                if match_range.group(4) is None:
-                    start = int(match_range.group(1))
-                    end = int(match_range.group(2))
-                    label = label_mapping[match_range.group(3)]
-                    if label != 0:  # drop manual X labels; we will read them from the features file
-                        samples.append(generate_sample_dict(start, end, label))
-                if match_range.group(5) is not None:
-                    offset_point = int(match_range.group(5))
-                    offset_points.append((start, offset_point))
-            else:
-                print("Unmatched line: {:s}".format(line))
-        if verbosity >= 1:
-            print("Line count: {:d}\nSamples parsed: {:d}".format(len(lines), len(samples)))
-
-        # insert automatic "out of frame / X labels"
-        samples_processed = []
-        start_at = 0
-
-        for sample in samples + [generate_sample_dict(len(present_flags), 0, -99)]:
-            if sample[Fields.start] > 0:
-                begin_x_frame = start_at
-                while begin_x_frame < sample[Fields.start]:
-                    if not present_flags[begin_x_frame]:
-                        end_x_frame = begin_x_frame
-                        while end_x_frame < sample[Fields.start] and not present_flags[end_x_frame]:
-                            end_x_frame += 1
-                        if end_x_frame - begin_x_frame < args.min_sequence_length:
-                            if verbosity >= 2:
-                                print(("WARNING: Got a suspiciously short X (out of frame) sequence,"
-                                       + " [{:d},{:d}], for source {:s}")
-                                      .format(begin_x_frame, end_x_frame - 1, view_name))
-                        else:
-                            samples_processed.append(
-                                generate_sample_dict(begin_x_frame, end_x_frame - 1, label_mapping['X']))
-                        begin_x_frame = end_x_frame
-                    begin_x_frame += 1
-                if sample[Fields.label] != -99:
-                    samples_processed.append(sample)
-            start_at = sample[Fields.end] + 1
-        samples = samples_processed
-
-        # insert "Default" label if required
+        # ========================= insert "Default" label sequences if required ===================================== #
         # both bounds of each sequence are inclusive
         if args.default_label:
-            samples_processed = []
-            if args.default_label and samples[0][Fields.start] > args.min_sequence_length:
-                samples_processed.append(
-                    generate_sample_dict(0, samples[0][Fields.start] - 1, default_behavior_label))
-            for ix_sample in range(len(samples) - 1):
-                sample = samples[ix_sample]
-                next_sample = samples[ix_sample + 1]
-                samples_processed.append(sample)
-                if next_sample[Fields.start] - (sample[Fields.end] + 1) > args.min_sequence_length:
-                    samples_processed.append(
-                        generate_sample_dict(sample[Fields.end] + 1, next_sample[Fields.start] - 1,
-                                             default_behavior_label))
-            sample = samples[-1]
-            samples_processed.append(sample)
-            samples = samples_processed
+            samples = insert_default_label_sequences(args, samples, default_behavior_label)
 
+        # if given multiview-only setting, skip writing json label files for individual views
         if not args.multiview_only:
-            if verbosity > 0:
+            if args.verbosity > 0:
                 print("Saving output to {:s}".format(output_file))
             file_handle = open(output_path, 'w')
             json.dump(samples, file_handle, indent=3)
@@ -394,9 +445,10 @@ def main():
         multiview_samples.append(samples)
         view_offsets.append(offset_points)
 
-    if args.single_view_only:
-        return 0
+    return multiview_samples, view_names
 
+
+def generate_multiview_labels(args, multiview_samples, view_names, default_behavior_label):
     multiview_hashes = [{sample[Fields.start]: sample for sample in multiview_sample_set} for multiview_sample_set in
                         multiview_samples]
     view_count = len(view_names)
@@ -422,10 +474,10 @@ def main():
                 closest_time_gap = sys.maxsize
                 closest_sample = None
                 for target_sample in multiview_samples[ix_target_view]:
-                    if (target_sample[Fields.label] == default_behavior_label or (
-                                    target_sample[Fields.label] != label_mapping['X'] and
-                                    target_sample[Fields.label] != source_sample[Fields.label])
-                        or target_sample[Fields.start] in nondefault_processed[ix_target_view]):
+                    if (target_sample[Fields.label] == default_behavior_label or
+                                target_sample[Fields.start] in nondefault_processed[ix_target_view] or
+                            (target_sample[Fields.label] != label_mapping['X'] and
+                                     target_sample[Fields.label] != source_sample[Fields.label])):
                         continue
                     time_gap = abs(source_sample[Fields.start] - target_sample[Fields.start])
                     # if the mouse is not in view for sure during that source sequence, match that not-in-view sequence
@@ -441,10 +493,9 @@ def main():
                 # didn't find a "closest" sample at all!
                 if closest_sample is None:
                     raise (ValueError(
-                        "Could not find match for samples {:s}:{:s} and {:s}:{:s}".format(str(source_sample),
-                                                                                          source_view,
-                                                                                          str(target_sample),
-                                                                                          view_names[ix_target_view])))
+                        "Could not find match for sample {:s}:{:s} in view {:s}".format(str(source_sample),
+                                                                                        source_view,
+                                                                                        view_names[ix_target_view])))
                 if closest_sample[Fields.label] != label_mapping['X'] and closest_time_gap > args.time_offset_threshold:
                     raise (ValueError(
                         "Starting times for samples {:s}:{:s} and {:s}:{:s} are too far apart. Gap: {:d}".format(
@@ -457,6 +508,7 @@ def main():
             nondefault_sample_groups.append(sample_group)
             nondefault_processed_source.add(source_sample[Fields.start])
 
+    # sort by start of the first sample in each set
     nondefault_sample_groups.sort(
         key=lambda sample_group: np.min(
             [view_list[0][Fields.start] if view_list[0][Fields.label] != label_mapping['X'] else sys.maxsize for
@@ -497,6 +549,120 @@ def main():
     file_handle = open(output_path, 'w')
     json.dump(sample_groups, file_handle, indent=3)
     file_handle.close()
+
+
+def process_multiview_offsets(args, samples, offset_points, view_names):
+    multiview_samples = []
+    for view_name in view_names:
+        view_samples = []
+        if view_name in offset_points:
+            view_offset_points = offset_points[view_name]
+            offset_period_start = 0
+            offset_start = 0
+            i_offset_point = 0
+            offset_period_end = view_offset_points[i_offset_point][0]
+            offset_end = view_offset_points[i_offset_point][1]
+            no_more_offsets = False
+            offset = 0
+            for sample in samples:
+                cur_start = sample[Fields.start]
+                if not no_more_offsets:
+                    if cur_start > offset_period_end:
+                        offset_period_start = offset_period_end
+                        offset_start = offset_end
+                        if i_offset_point == len(view_offset_points):
+                            no_more_offsets = True
+                            offset_period_end = offset_period_start + 100000000
+                        else:
+                            i_offset_point += 1
+                            offset_period_end = view_offset_points[i_offset_point][0]
+                            offset_end = view_offset_points[i_offset_point][1]
+
+                    ratio = (cur_start - offset_period_start) / (offset_period_end - offset_period_start)
+                    offset = round(offset_start * (1.0 - ratio) + offset_end * ratio)
+
+                view_samples.append(
+                    generate_sample_dict(sample[Fields.start] + offset + args.global_offset,
+                                         sample[Fields.end] + offset + args.global_offset,
+                                         sample[Fields.label]))
+        else:
+            for sample in samples:
+                view_samples.append(
+                    generate_sample_dict(sample[Fields.start] + args.global_offset,
+                                         sample[Fields.end] + args.global_offset, sample[Fields.label]))
+        multiview_samples.append(view_samples)
+    return multiview_samples
+
+
+def process_view_labels_from_multiview_file(args, default_behavior_label):
+    input_file_path = os.path.join(args.folder, args.input)
+    file_handle = open(input_file_path, 'r')
+    lines = tuple(file_handle)
+    file_handle.close()
+    header_line = lines[0]
+    header_match_regex = re.compile(r"!(?:\s*\w+\s*,)+\s*\w+\s*")
+    text_group_regex = re.compile(r"\w+")
+    if header_match_regex.match(header_line) is None:
+        raise ValueError("Incorrect format. The header line of the multiview-format label file should be: "
+                         + "! view_name_1 [, view_name_2, view_name_3 ...]")
+    view_names = text_group_regex.findall(header_line)
+
+    samples, offset_points = parse_label_lines(args, lines, multiview_mode=True)
+    multiview_samples = process_multiview_offsets(args, samples, offset_points)
+    multiview_samples_processed = []
+
+    for view_name, view_samples in zip(view_names, multiview_samples):
+
+        feature_file_name = view_name + "_features.npz"
+        feature_path = os.path.join(args.folder, feature_file_name)
+        if not os.path.isfile(feature_path):
+            raise (IOError("Could not find feature file at {:s}. Each view in header of multiview-format label input " +
+                           "file should have a corresponding feature file, <view name>_features_npz."
+                           .format(feature_path)))
+        present_flags = np.load(feature_path)['present']
+        view_samples = insert_out_of_frame_sequences(args, view_samples, present_flags=present_flags)
+        if args.default_label:
+            view_samples = insert_default_label_sequences(args, view_samples, default_behavior_label)
+        multiview_samples_processed.append(view_samples)
+        # if given multiview-only setting, skip writing json label files for individual views
+        if not args.multiview_only:
+            if args.output_suffix:
+                output_file = view_name + args.output_suffix + ".json"
+            else:
+                output_file = view_name + ".json"
+            output_path = os.path.join(args.folder, output_file)
+            if args.verbosity > 0:
+                print("Saving output to {:s}".format(output_file))
+            file_handle = open(output_path, 'w')
+            json.dump(samples, file_handle, indent=3)
+            file_handle.close()
+
+    multiview_samples = multiview_samples_processed
+
+    return multiview_samples, view_names
+
+
+def main():
+    args = process_arguments(Arguments, "text label -> JSON Label Converter for LSTM")
+
+    default_behavior_label = 4
+
+    if args.multiview_only and args.single_view_only:
+        raise ValueError("{:s} and {:s} arguments cannot be combined.".format(Arguments.single_view_only.name,
+                                                                              Arguments.multiview_only.name))
+
+    if args.multiview_format:
+        if args.input is None or type(args.input) != str:
+            raise ValueError("--multiview_format (-mf) mode requires the input argument to be set to the name of a " +
+                             "single multiview-format label input file.")
+        multiview_samples, view_names = process_view_labels_from_multiview_file(args, default_behavior_label)
+    else:
+        multiview_samples, view_names = process_individual_label_files(args, default_behavior_label)
+
+    if args.single_view_only:
+        return 0
+
+    generate_multiview_labels(multiview_samples, view_names, default_behavior_label)
 
     return 0
 

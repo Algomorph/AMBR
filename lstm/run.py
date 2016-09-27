@@ -45,7 +45,9 @@ def main():
 
     model_path = os.path.join(model_dir, 'lstm_model.npz')
 
-    training_data, validation_data, test_data, n_categories, n_features = load_data(args.datasets, args.folder)
+    training_data, validation_data, test_data, n_categories, n_features = \
+        load_data(args.datasets, args.folder, args.validation_ratio, args.test_ratio)
+
     # This create the initial parameters as np ndarrays.
     # This will create Theano Shared Variables from the model parameters.
     if args.reload_model:

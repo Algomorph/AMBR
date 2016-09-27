@@ -60,6 +60,7 @@ class VideoProcessor(metaclass=ABCMeta):
 
         self.cap = None
         self.reload_video()
+        print("Processing video file {:s}.".format(self.in_video))
 
         last_frame = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) - 1)
 
@@ -71,6 +72,8 @@ class VideoProcessor(metaclass=ABCMeta):
                        " ({:d}). Stopping after last frame.")
                       .format(self.end_with, last_frame))
                 self.end_with = last_frame
+
+        print("Frame range: {:d}--{:d}".format(self.start_from, self.end_with))
 
         if with_video_output:
             if self.out_video == "":

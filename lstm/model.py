@@ -85,7 +85,7 @@ class Model(object):
 
         # build the actual network and compile all the necessary functions for training & testing
         (self.noise_flag, self.batch_features, self.mask, self.cost_weights, self.batch_labels,
-         self.compute_sequence_class_probabilities, self.classify_sequence, self.compute_loss,
+         self.compute_sequence_class_probabilities, self.classify_sequences, self.compute_loss,
          self.classify_timesteps, self.get_network_state) = \
             build_network(parameters, use_dropout, weighted_loss, random_seed)
         build_optimizer = get_optimizer_constructor(optimizer_name)
@@ -127,7 +127,7 @@ class Model(object):
         for index_set in index_sets:
             batch_features, mask, batch_labels = prepare_data([data.features[t] for t in index_set],
                                                               np.array(data.labels)[index_set])
-            sequence_classifications = self.classify_sequence(batch_features, mask)
+            sequence_classifications = self.classify_sequences(batch_features, mask)
             target_labels = np.array(data.labels)[index_set]
             error += (sequence_classifications == target_labels).sum()
 

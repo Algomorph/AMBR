@@ -49,6 +49,7 @@ class SequenceDataset(object):
     Each sequences has a label associated with it.
     Meta information is just the way the sequence was represented in the file.
     """
+
     def __init__(self, sequence_features, sequence_labels, meta_information, weights=None):
         self.features = sequence_features
         self.labels = sequence_labels
@@ -67,13 +68,16 @@ class SequenceDataset(object):
         return len(self.features)
 
 
-def load_data(datasets, base_work_folder):
+def load_data(datasets, base_work_folder, validation_ratio=0.2, test_ratio=0.2):
     """Loads the dataset
-    :type path: String
-    :param path: The path to the dataset
-    :type valid_portion: float
-    :param valid_portion: The proportion of the full train set used for
-        the validation set.
+    :type datasets: list[str]
+    :param datasets: names of the datasets
+    :type base_work_folder: str
+    :param base_work_folder: The folder containing all datasets
+    :type validation_ratio: float
+    :param validation_ratio: The fraction of the full train set used for the validation set.
+    :type test_ratio: float
+    :param test_ratio: The fraction of the full train set used for the test set.
     :rtype: (lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, lstm.data_io.SequenceDataset, int, int)
     :return training, validation, and testing dataset, the category and the feature counts
     """
@@ -117,8 +121,7 @@ def load_data(datasets, base_work_folder):
     # split features into test, training, and validation set
     n_samples = len(features_by_sample)
     randomized_index = np.random.permutation(n_samples)
-    test_ratio = 0.2
-    train_ratio = 0.6
+    train_ratio = 1.0 - test_ratio - validation_ratio
     test_count = int(np.round(n_samples * test_ratio))
     train_count = int(np.round(n_samples * train_ratio))
     start_train = test_count
@@ -153,3 +156,44 @@ def load_data(datasets, base_work_folder):
     n_features = len(test_set_x[0][0])
 
     return training_set, validation_set, test_set, n_categories, n_features
+
+
+class SequenceSet(object):
+    def __init__(self, sequence_feature_set, sequence_meta_set, group_label):
+        self.sequence_features = sequence_feature_set
+        self.sequence_meta = sequence_meta_set
+        self.label = group_label
+
+
+def load_multiview_data(datasets, base_work_folder):
+    base_data_path = os.path.join(base_work_folder, "data")
+    multiview_labels_file = os.path.join(base_data_path, "multiview_samples.json")
+    multivew_label_entries = json.load(open(multiview_labels_file, 'r'))
+    multiview_features = []
+    # load features for each view
+    for obj in datasets:
+        features_path = os.path.join(base_data_path, "{:s}_features.npz".format(obj))
+        print('  loading features from: %s' % (features_path,))
+        archive = np.load(features_path)
+        multiview_features.append(archive["features"])
+
+    multiview_data = []
+
+    features_by_sample = []
+    labels_by_sample = []
+    meta_by_sample = []
+    groups = []
+    for group_entry in multivew_label_entries:
+        group_data = []
+        for sequence_set, view_features in zip(group_entry, multiview_features):
+            sequence_feature_set = []
+            sequence_meta_set = []
+            group_label = None
+            for sequence_entry in sequence_set:
+                sample_features = view_features[sequence_entry['start']:sequence_entry['end'] + 1, :]
+                sequence_feature_set.append(sample_features)
+                group_label = sequence_entry['label']
+                sequence_meta_set.append(sequence_entry)
+            sequence_set = SequenceSet(sequence_feature_set, sequence_meta_set, group_label)
+            group_data.append(sequence_set)
+        groups.append(group_data)

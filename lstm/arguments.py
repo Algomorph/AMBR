@@ -29,7 +29,7 @@ class Arguments(Enum):
     max_epochs = Argument(default=300, arg_type=int, arg_help="Maximum number of epochs to run.")
 
     report_interval = Argument(default=50, arg_type=int,
-                                arg_help="Interval (in updates) between re-printing progress to stdout.")
+                               arg_help="Interval (in updates) between re-printing progress to stdout.")
     decay_constant = Argument(default=0., arg_type=float,
                               arg_help="Weight decay for the classifier applied to the U weights.")
     learning_rate = Argument(default=0.0001, arg_type=float,
@@ -64,3 +64,5 @@ class Arguments(Enum):
     random_seed = Argument(default=2016, arg_type=int,
                            arg_help="Random seed to use for shuffling sample sequences and initializing weights.")
     datasets = Argument(default=["al0"], nargs='+', arg_help="data sets to process")
+    validation_ratio = Argument(default=0.2, arg_type=float, arg_help="Ratio of the data to use for validation.")
+    test_ratio = Argument(default=0.2, arg_type=float, arg_help="Ratio of the data to use for testing.")
