@@ -165,7 +165,7 @@ class SequenceSet(object):
         self.label = group_label
 
 
-def load_multiview_data(datasets, base_work_folder):
+def load_multiview_data(datasets, base_work_folder, validation_ratio=0.2, test_ratio=0.2):
     base_data_path = os.path.join(base_work_folder, "data")
     multiview_labels_file = os.path.join(base_data_path, "multiview_samples.json")
     multivew_label_entries = json.load(open(multiview_labels_file, 'r'))
@@ -179,9 +179,6 @@ def load_multiview_data(datasets, base_work_folder):
 
     multiview_data = []
 
-    features_by_sample = []
-    labels_by_sample = []
-    meta_by_sample = []
     groups = []
     for group_entry in multivew_label_entries:
         group_data = []
@@ -197,3 +194,16 @@ def load_multiview_data(datasets, base_work_folder):
             sequence_set = SequenceSet(sequence_feature_set, sequence_meta_set, group_label)
             group_data.append(sequence_set)
         groups.append(group_data)
+
+    n_groups = len(groups)
+    randomized_index = np.random.permutation(n_groups)
+    train_ratio = 1.0 - test_ratio - validation_ratio
+    test_count = int(np.round(n_groups * test_ratio))
+    train_count = int(np.round(n_groups * train_ratio))
+    validation_count = n_groups - test_count - train_count
+
+    train_groups = [groups[ix] for ix in randomized_index[0:train_count]]
+    validation_groups = [groups[ix] for ix in randomized_index[train_count:train_count + validation_count]]
+    test_groups = [groups[ix] for ix in randomized_index[train_count + validation_count:]]
+
+
