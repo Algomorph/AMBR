@@ -177,8 +177,6 @@ def load_multiview_data(datasets, base_work_folder, validation_ratio=0.2, test_r
         archive = np.load(features_path)
         multiview_features.append(archive["features"])
 
-    multiview_data = []
-
     groups = []
     for group_entry in multivew_label_entries:
         group_data = []
@@ -205,5 +203,9 @@ def load_multiview_data(datasets, base_work_folder, validation_ratio=0.2, test_r
     train_groups = [groups[ix] for ix in randomized_index[0:train_count]]
     validation_groups = [groups[ix] for ix in randomized_index[train_count:train_count + validation_count]]
     test_groups = [groups[ix] for ix in randomized_index[train_count + validation_count:]]
+
+    # break up the train & validation groups into individual sequence samples
+    train_groups =
+
 
 
