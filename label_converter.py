@@ -40,6 +40,7 @@ class Arguments(Enum):
     verbosity = Argument(arg_help="Verbosity level", arg_type=int, default=1)
     global_offset = Argument(arg_help="Global offset (with respect to the features) to add to all the frame numbers.",
                              arg_type=int, default=0)
+    multiview_output_suffix = Argument(arg_help="Name ouf the multiview output file suffix", arg_type=str,default="")
 
 
 class Fields(object):
@@ -49,19 +50,19 @@ class Fields(object):
 
 
 label_mapping = {
-    "X": 0,
+    "X": 4,
     "G": 1,
     "R": 2,
     "S": 3,
-    "C": 4
+    "C": 0
 }
 
 inverse_label_mapping = {
-    0: "X",
+    4: "X",
     1: "G",
     2: "R",
     3: "S",
-    4: "C"
+    0: "C"
 }
 
 
@@ -462,10 +463,11 @@ def process_individual_label_files(args, default_behavior_label):
 
         # if given multiview-only setting, skip writing json label files for individual views
         if not args.multiview_only:
+            non_empty_samples = [sample for sample in samples if sample[Fields.label] != label_mapping['X']]
             if args.verbosity > 0:
                 print("Saving output to {:s}".format(output_file))
             file_handle = open(output_path, 'w')
-            json.dump(samples, file_handle, indent=3)
+            json.dump(non_empty_samples, file_handle, indent=3)
             file_handle.close()
 
         multiview_samples.append(samples)
@@ -477,7 +479,7 @@ def process_individual_label_files(args, default_behavior_label):
 def output_and_print_multiview_groups(args, sample_groups, view_names):
     print_matched_labels(sample_groups, view_names)
 
-    output_path = os.path.join(args.folder, "multiview_samples.json")
+    output_path = os.path.join(args.folder, "multiview_samples" + args.multiview_output_suffix + ".json")
     file_handle = open(output_path, 'w')
     json.dump(sample_groups, file_handle, indent=3)
     file_handle.close()
@@ -487,14 +489,13 @@ def generate_multiview_labels(args, multiview_samples, view_names, default_behav
     multiview_hashes = [{sample[Fields.start]: sample for sample in multiview_sample_set} for multiview_sample_set in
                         multiview_samples]
     view_count = len(view_names)
-    # go through all view sample sets one-by-one, treating each view as "source"
+
+    # go through all sample sets one-by-one, treating them as "source"
     # looks only for matches between non-default label segments here
     nondefault_sample_groups = []
     nondefault_processed = [set() for _ in view_names]
-
     for ix_source_view, source_view in enumerate(view_names):
         nondefault_processed_source = nondefault_processed[ix_source_view]
-        last_group = None
         for source_sample in multiview_samples[ix_source_view]:
             if source_sample[Fields.label] == default_behavior_label or source_sample[Fields.label] == label_mapping[
                 'X'] \
@@ -502,93 +503,61 @@ def generate_multiview_labels(args, multiview_samples, view_names, default_behav
                 continue
             sample_group = [None] * view_count
             sample_group[ix_source_view] = [source_sample]
-            complete_group = True
             for ix_target_view in range(0, view_count):
                 if ix_target_view == ix_source_view:
                     continue
                 closest_time_gap = sys.maxsize
                 closest_sample = None
-                # closest_overlap = 0
-                missing_view_ixs = []
                 for target_sample in multiview_samples[ix_target_view]:
-                    if (target_sample[Fields.label] == default_behavior_label or
-                                target_sample[Fields.start] in nondefault_processed[ix_target_view] or
-                            (target_sample[Fields.label] != label_mapping['X'] and
-                                     target_sample[Fields.label] != source_sample[Fields.label])):
+                    if (target_sample[Fields.start] in nondefault_processed[ix_target_view] and
+                                     target_sample[Fields.label] != source_sample[Fields.label]):
                         continue
                     time_gap = abs(source_sample[Fields.start] - target_sample[Fields.start])
-                    target_overlap = calculate_sample_overlap(target_sample, source_sample)
-                    # if the mouse is not in view for sure during that source sequence, match that not-in-view sequence
-                    if (target_sample[Fields.label] == label_mapping['X'] and
-                            (source_sample[Fields.start] - target_sample[Fields.start] > args.time_offset_threshold
-                             and target_sample[Fields.end] - source_sample[Fields.end] > args.time_offset_threshold)):
-                        closest_sample = target_sample
-                        break
-                    if closest_time_gap > time_gap or (
-                                    target_sample[Fields.label] == source_sample[
-                                    Fields.label] and target_overlap >= min(sample_len(source_sample) / 2,
-                                                                            sample_len(target_sample) / 2)):
+
+                    if closest_time_gap > time_gap:
                         closest_time_gap = time_gap
                         closest_sample = target_sample
-                        # closest_overlap = target_overlap
-                if (closest_sample is not None and
-                            calculate_sample_overlap(closest_sample, source_sample) >= args.min_sequence_length
-                    and ((closest_sample[Fields.label] == label_mapping['X'] or
-                                  closest_time_gap <= args.time_offset_threshold))):
-                    if closest_sample[Fields.label] != label_mapping['X']:
-                        nondefault_processed[ix_target_view].add(closest_sample[Fields.start])
-                    sample_group[ix_target_view] = [closest_sample]
-                else:
-                    if complete_group:
-                        complete_group = False
-                        bad_sample = closest_sample
-                        bad_time_gap = closest_time_gap
-                        bad_view = ix_target_view
-                    missing_view_ixs.append(ix_target_view)
+                # if corresponding same-label sample is not found, search for out-of-view sample that matches
+                if closest_sample is None or closest_time_gap > args.time_offset_threshold:
+                    for target_sample in multiview_samples[ix_target_view]:
+                        if (target_sample[Fields.label] != label_mapping['X'] or
+                                    target_sample[Fields.start] in nondefault_processed[ix_target_view]):
+                            continue
+                        time_gap = abs(source_sample[Fields.start] - target_sample[Fields.start])
+                        # if the mouse is not in view for sure during that source sequence,
+                        # match that not-in-view sequence
+                        if (target_sample[Fields.label] == label_mapping['X'] and
+                                (source_sample[Fields.start] - target_sample[Fields.start] > args.time_offset_threshold
+                                 and target_sample[Fields.end] - source_sample[Fields.end] > args.time_offset_threshold)):
+                            closest_sample = target_sample
+                            break
 
-            if not complete_group and last_group is not None:
-                # check if there is significant overlap with the samples in previous group
-                complete_group = True
-                for ix_view, sample_list in enumerate(sample_group):
-                    if sample_list is not None:
-                        for ix in missing_view_ixs:
-                            if calculate_sample_overlap(sample_list[0], last_group[ix][-1]) < args.min_sequence_length \
-                                    and (sample_list[0][Fields.label] != last_group[ix][-1][Fields.label]
-                                         or sample_list[0][Fields.label] == 'X'
-                                         or last_group[ix][-1][Fields.label] == 'X'):
-                                complete_group = False
-                            else:
-                                last_group[ix_view].append(sample_list[0])
-                                if sample_list[0][Fields.label] != label_mapping['X']:
-                                    nondefault_processed[ix_view].add(sample_list[0][Fields.start])
-            else:
-                for sample_list in sample_group:
-                    if sample_list is None:
-                        print(last_group)
-                        raise ValueError("OMG {:s}".format(str(sample_group)))
-                last_group = sample_group
-                nondefault_sample_groups.append(sample_group)
-                nondefault_processed_source.add(source_sample[Fields.start])
-            if not complete_group:
-                if bad_sample is None:
+                        if closest_time_gap > time_gap:
+                            closest_time_gap = time_gap
+                            closest_sample = target_sample
+                # didn't find a "closest" sample at all!
+                if closest_sample is None:
                     raise (ValueError(
                         "Could not find match for sample {:s}:{:s} in view {:s}".format(str(source_sample),
                                                                                         source_view,
-                                                                                        view_names[
-                                                                                            ix_target_view])))
-
-                if bad_sample[Fields.label] != label_mapping['X'] and bad_time_gap > args.time_offset_threshold:
+                                                                                        view_names[ix_target_view])))
+                if closest_sample[Fields.label] != label_mapping['X'] and closest_time_gap > args.time_offset_threshold:
                     raise (ValueError(
                         "Starting times for samples {:s}:{:s} and {:s}:{:s} are too far apart. Gap: {:d}".format(
                             str(source_sample), source_view,
-                            str(bad_sample), view_names[bad_view], bad_time_gap)))
+                            str(closest_sample), view_names[ix_target_view],
+                            closest_time_gap)))
+                if closest_sample[Fields.label] != label_mapping['X']:
+                    nondefault_processed[ix_target_view].add(closest_sample[Fields.start])
+                sample_group[ix_target_view] = [closest_sample]
+            nondefault_sample_groups.append(sample_group)
+            nondefault_processed_source.add(source_sample[Fields.start])
 
-    # sort groups by start of the first sample in each set
+    # sort by start of the first sample in each set
     nondefault_sample_groups.sort(
         key=lambda sample_group: np.min(
             [view_list[0][Fields.start] if view_list[0][Fields.label] != label_mapping['X'] else sys.maxsize for
              view_list in sample_group]))
-    print_matched_labels(nondefault_sample_groups, view_names)
 
     # now, look into the time-gaps between our matched sets
     sample_groups = []
@@ -613,10 +582,9 @@ def generate_multiview_labels(args, multiview_samples, view_names, default_behav
                             raise (ValueError("Unmatched sample {:s} for view {:s}"
                                               .format(str(sample), view_names[ix_view])))
 
-            previous_end_times[ix_view] = nondefault_sample_set[-1][Fields.end]
-            nondefault_sample_group[ix_view] = \
-                [sample for sample in nondefault_sample_group[ix_view]
-                 if sample[ix_view][Fields.label] != label_mapping['X']]
+            previous_end_times[ix_view] = nondefault_sample[Fields.end]
+            if nondefault_sample[Fields.label] == label_mapping['X']:
+                nondefault_sample_group[ix_view] = []
         sample_groups.append(default_or_empty_sample_group)
         sample_groups.append(nondefault_sample_group)
 
@@ -850,7 +818,7 @@ def process_multiview_file(args, default_behavior_label):
 def main():
     args = process_arguments(Arguments, "text label -> JSON Label Converter for LSTM")
 
-    default_behavior_label = 4
+    default_behavior_label = label_mapping['C']
 
     if args.multiview_only and args.single_view_only:
         raise ValueError("{:s} and {:s} arguments cannot be combined.".format(Arguments.single_view_only.name,

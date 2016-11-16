@@ -4,76 +4,83 @@ Build a tweet sentiment analyzer
 """
 
 # stdlib
-from collections import OrderedDict
-import pickle as pkl
-import time
 import os
 import sys
-from contextlib import contextmanager
-
-# scipy stack
-import numpy as np
-import scipy.io as sio
-
-# theano
-import theano
-from theano import config
-import theano.tensor as tensor
 
 # charts
 import matplotlib as mpl
 
 from matplotlib import pyplot as plt
-from lstm.data_io import load_data
+from lstm.data_io import load_data, load_multiview_data, load_test_data, load_multiview_test_data
 from ext_argparse.argproc import process_arguments
 from lstm.arguments import Arguments
 from lstm.params import Parameters
-from lstm.model import Model
+from lstm.network import Network
 
 mpl.rcParams['image.interpolation'] = 'nearest'
 
 
 def main():
     args = process_arguments(Arguments, "Train & test an LSTM model on the given input.")
-    # TODO: make model path an argument
-    model_subdir = 'monocular_model'
-    model_dir = os.path.join(args.folder, model_subdir)
 
     verbose = True
+
+    model_path = os.path.join(args.folder, args.model_file)
+    model_dir = os.path.dirname(model_path)
+
+    # make subfolders for model file (if there are some specified in the model_file but they don't yet exist)
     if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
+        os.makedirs(model_dir)
 
-    model_path = os.path.join(model_dir, 'lstm_model.npz')
+    if args.test_entire_data:
+        if args.multiview_labels is None:
+            test_data, n_categories, n_features = \
+                load_test_data(args.datasets, args.folder)
+        else:
+            test_data, test_groups, n_categories, n_features = \
+                load_multiview_test_data(args.datasets, args.folder, args.multiview_labels)
+    else:
+        if args.multiview_labels is None:
+            training_data, validation_data, test_data, n_categories, n_features = \
+                load_data(args.datasets, args.folder, args.validation_ratio, args.test_ratio)
+        else:
+            training_data, validation_data, test_data, test_groups, n_categories, n_features = \
+                load_multiview_data(args.datasets, args.folder, args.multiview_labels,
+                                    args.validation_ratio, args.test_ratio)
 
-    training_data, validation_data, test_data, n_categories, n_features = \
-        load_data(args.datasets, args.folder, args.validation_ratio, args.test_ratio)
-
-    # This create the initial parameters as np ndarrays.
+    # This create the initial parameters as numpy arrays.
     # This will create Theano Shared Variables from the model parameters.
     if args.reload_model:
         parameters = Parameters(archive=model_path)
     else:
         parameters = Parameters(n_features, args.hidden_unit_count, n_categories)
 
-    model = Model(optimizer_name=args.optimizer, model_output_path=model_path, parameters=parameters,
-                  random_seed=args.random_seed, decay_constant=args.decay_constant)
+    network = Network(optimizer_name=args.optimizer, model_output_path=model_path, parameters=parameters,
+                      random_seed=args.random_seed, decay_constant=args.decay_constant)
 
     # Turn interactive plotting off
     plt.ioff()
 
-    if verbose:
-        print("Sample counts:")
-        print("%d Training sample count:" % len(training_data))
-        print("%d Validation sample count:" % len(validation_data))
-        print("%d Testing sample count:" % len(test_data))
-        print('Training the model...')
+    if not args.test_entire_data:
+        if verbose:
+            print("--------------------")
+            print("SAMPLE COUNTS")
+            print("Training: %d " % len(training_data))
+            print("Validation: %d" % len(validation_data))
+            print("Test: %d" % len(test_data))
+            print("--------------------")
 
-    if args.overwrite_model or not os.path.isfile(model_path):
-        model.train_on(training_data, validation_data, test_data, args.batch_size, args.validation_batch_size,
-                       args.report_interval, args.validation_interval, args.save_interval, args.patience,
-                       args.max_epochs, learning_rate=args.learning_rate)
 
-    model.test_on(test_data)
+        if args.overwrite_model or not os.path.isfile(model_path):
+            network.train(training_data, validation_data, test_data, args.batch_size, args.validation_batch_size,
+                          args.report_interval, args.validation_interval, args.save_interval, args.patience,
+                          args.max_epochs, learning_rate=args.learning_rate)
+
+    if args.multiview_labels:
+        network.test(test_data)
+        network.multiview_test(test_groups)
+    else:
+        network.test(test_data)
     return 0
 
 

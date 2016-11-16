@@ -28,10 +28,10 @@ from lstm.network_construction import build_network
 from lstm.common import to_numpy_theano_float
 from lstm.optimizer import get_optimizer_constructor
 from lstm.params import Parameters
-from lstm.data_io import prepare_data
+from lstm.data_io import prepare_data, SequenceSet
 
 
-class Model(object):
+class Network(object):
     """
     Class that represents an LSTM network padded by embedding & classification layers.
     """
@@ -224,10 +224,10 @@ class Model(object):
         parameters = Parameters(feature_count=self.feature_count, hidden_unit_count=self.hidden_unit_count,
                                 category_count=self.category_count)
 
-    def train_on(self, training_data, validation_data, test_data,
-                 batch_size=10, validation_batch_size=5,
-                 report_interval=50, validation_interval=20, save_interval=20,
-                 patience=15, max_epochs=300, learning_rate=0.0001, check_gradients=False, verbose=True):
+    def train(self, training_data, validation_data, test_data,
+              batch_size=10, validation_batch_size=5,
+              report_interval=50, validation_interval=20, save_interval=20,
+              patience=15, max_epochs=300, learning_rate=0.0001, check_gradients=False, verbose=True):
         """
         Train the model.
 
@@ -262,12 +262,14 @@ class Model(object):
         :param verbose: print supplementary output
         :return:
         """
+        if verbose:
+            print('Training the network...')
 
         if self.parameters is None:
             self.initialize_parameters(training_data)
 
-        validation_batch_indices = Model.get_batch_indices(len(validation_data), validation_batch_size)
-        test_batch_indices = Model.get_batch_indices(len(test_data), validation_batch_size)
+        validation_batch_indices = Network.get_batch_indices(len(validation_data), validation_batch_size)
+        test_batch_indices = Network.get_batch_indices(len(test_data), validation_batch_size)
 
         error_history = []
         epoch_index_aggregate = []
@@ -281,13 +283,14 @@ class Model(object):
 
         best_parameters = None
 
+        # =============== MAIN TRAINING LOOP BEGIN ============================================== #
         try:
             for epoch_index in range(max_epochs):
 
                 epoch_samples_processed = 0
 
                 # Get new shuffled index for the training set.
-                train_minibatch_indices = Model.get_batch_indices(len(training_data), batch_size, shuffle=True)
+                train_minibatch_indices = Network.get_batch_indices(len(training_data), batch_size, shuffle=True)
 
                 # traverse all the mini-batches
                 for training_minibatch_indices in train_minibatch_indices:
@@ -311,7 +314,7 @@ class Model(object):
                     # # Check gradients
                     if check_gradients:
                         gradients = self.compute_gradients(*inputs)
-                        print('gradients :', [np.mean(g) for g in Model.theano_to_numpy_grad_array(gradients)])
+                        print('gradients :', [np.mean(g) for g in Network.theano_to_numpy_grad_array(gradients)])
                         print('parameters :', [np.mean(vv) for kk, vv in self.parameters.as_dict().items()])
 
                     loss = self.compute_shared_gradient(*inputs)
@@ -345,7 +348,7 @@ class Model(object):
                         plt.figure(1)
                         plt.clf()
                         lines = plt.plot(np.array(epoch_index_aggregate), np.array(error_history))
-                        plt.legend(lines, ['training error', 'validation error', 'test error'])
+                        plt.legend(lines, ['Training error', 'Validation error', 'Test error'])
                         if self.output_directory:
                             plt.savefig(os.path.join(self.output_directory, "error.png"))
                         time.sleep(0.1)
@@ -357,7 +360,7 @@ class Model(object):
                             if validation_error < np.array(error_history)[:, 1].min() and verbose:
                                 print('  New best validation results.')
                         if verbose:
-                            print("Training error=%.06f |  validation error=%.06f | test error=%.06f" % (
+                            print("Training error=%.06f |  Validation error=%.06f | Test error=%.06f" % (
                                 training_error, validation_error, test_error))
 
                         if (len(error_history) > patience
@@ -380,13 +383,14 @@ class Model(object):
 
         except KeyboardInterrupt:
             print("Training interrupted")
+        # =============== MAIN TRAINING LOOP END ============================================== #
 
         end_time = time.time()
         if best_parameters is None:
             best_parameters = self.parameters.as_dict()
 
         self.noise_flag.set_value(0.)
-        sorted_train_minibatch_index_sets = Model.get_batch_indices(len(training_data), batch_size)
+        sorted_train_minibatch_index_sets = Network.get_batch_indices(len(training_data), batch_size)
         training_error = self.compute_prediction_error(training_data, sorted_train_minibatch_index_sets)
         validation_error = self.compute_prediction_error(validation_data, validation_batch_indices)
         test_error = self.compute_prediction_error(test_data, test_batch_indices)
@@ -416,21 +420,8 @@ class Model(object):
 
         return confusion_matrix
 
-    def compute_prediction_precision_and_recall(self, sequence_dataset,
-                                                batch_index_sets, verbose=False):
-        n_samples = len(sequence_dataset)
-        category_probabilities = np.zeros((n_samples, self.category_count)).astype(config.floatX)
-        true_labels = np.zeros((n_samples,)).astype('int32')
-
-        for batch_index_set in batch_index_sets:
-            x, mask, y = prepare_data([sequence_dataset.features[t] for t in batch_index_set],
-                                      np.array(sequence_dataset.labels)[batch_index_set])
-            minibatch_category_probabilities = self.compute_sequence_class_probabilities(x, mask)
-            category_probabilities[batch_index_set, :] = minibatch_category_probabilities
-            true_labels[batch_index_set] = np.array(sequence_dataset.labels)[batch_index_set]
-
-        predicted_labels = np.argmax(category_probabilities, axis=1)
-        confusion_matrix = Model.calculate_confusion_matrix(true_labels, predicted_labels, self.category_count)
+    @staticmethod
+    def compute_precision_and_recall(confusion_matrix):
         correct_predictions = np.diagonal(confusion_matrix)
         samples_per_class = np.sum(confusion_matrix, axis=0)
         false_positives = np.sum(confusion_matrix, axis=1) - correct_predictions
@@ -445,25 +436,28 @@ class Model(object):
         rectmp[np.where(correct_predictions == 0)[0]] = 0
         rectmp[np.where(samples_per_class == 0)[0]] = float('nan')
         recall = np.nanmean(rectmp)
+        return precision, recall
+
+    def compute_prediction_precision_and_recall(self, sequence_dataset,
+                                                batch_index_sets, verbose=False):
+        n_samples = len(sequence_dataset)
+        category_probabilities = np.zeros((n_samples, self.category_count)).astype(config.floatX)
+        true_labels = np.zeros((n_samples,)).astype('int32')
+
+        for batch_index_set in batch_index_sets:
+            x, mask, y = prepare_data([sequence_dataset.features[t] for t in batch_index_set],
+                                      np.array(sequence_dataset.labels)[batch_index_set])
+            minibatch_category_probabilities = self.compute_sequence_class_probabilities(x, mask)
+            category_probabilities[batch_index_set, :] = minibatch_category_probabilities
+            true_labels[batch_index_set] = np.array(sequence_dataset.labels)[batch_index_set]
+
+        predicted_labels = np.argmax(category_probabilities, axis=1)
+        confusion_matrix = Network.calculate_confusion_matrix(true_labels, predicted_labels, self.category_count)
+        precision, recall = Network.compute_precision_and_recall(confusion_matrix)
 
         return category_probabilities, true_labels, precision, recall
 
-    def test_on(self, test_data, verbose=True):
-
-        if self.parameters is None:
-            # the odd case when the user wants to test a completely un-trained model
-            self.initialize_parameters(test_data)
-
-        validation_batch_size = 1
-
-        test_minibatch_index_sets = Model.get_batch_indices(len(test_data), validation_batch_size)
-        print("%d test examples" % len(test_data))
-
-        class_probabilities, true_labels, precision, recall = \
-            self.compute_prediction_precision_and_recall(test_data, test_minibatch_index_sets, verbose=False)
-
-        predicted_labels = np.argmax(class_probabilities, axis=1)
-        cm = Model.calculate_confusion_matrix(true_labels, predicted_labels, category_count=self.category_count)
+    def save_confusion_matrix_image(self, cm, suffix="sub"):
         cm = np.asarray(cm, 'float32')
         cm = cm / np.sum(cm, axis=0)
         cm[np.where(np.isnan(cm))] = 0
@@ -473,12 +467,82 @@ class Model(object):
         im = ax.imshow(cm, interpolation='nearest')
         f.colorbar(im)
         if self.output_directory is not None:
-            plt.savefig(os.path.join(self.output_directory, "confusion_matrix_sub.png"))
+            plt.savefig(os.path.join(self.output_directory, "confusion_matrix_" + suffix + ".png"))
+
+    def multiview_test(self, test_groups, verbose=True):
+        """
+        :type test_groups: list[list[lstm.data_io.SequenceSet]]
+        :param test_groups:
+        :param verbose:
+        :return:
+        """
+        true_labels = []
+        predicted_labels = []
+        category_probabilities = []
+
+        for group in test_groups:
+            cumulative_contributions = np.zeros((self.category_count,), dtype=np.float64)
+            non_empty_count = 0
+            true_label = None
+            for sequence_set in group:
+                if not sequence_set.empty():
+                    true_label = sequence_set.label
+                    non_empty_count += 1
+                    x, mask, y = prepare_data(sequence_set.features, sequence_set.label)
+                    set_category_probabilities = self.compute_sequence_class_probabilities(x, mask)
+                    # print("Set", np.argmax(set_category_probabilities, axis=1), sequence_set.label)
+                    set_category_probabilities *= sequence_set.contributions[np.newaxis].T
+                    cumulative_contributions += set_category_probabilities.sum(axis=0)
+
+            if true_label is not None:
+                group_category_probabilities = cumulative_contributions / non_empty_count
+                category_probabilities.append(group_category_probabilities)
+                true_labels.append(true_label)
+                predicted_label = np.argmax(cumulative_contributions)
+                predicted_labels.append(predicted_label)
+                # print("Group:", true_label, predicted_label, group_category_probabilities)
+        true_labels = np.array(true_labels, dtype=np.int32)
+        predicted_labels = np.array(predicted_labels, dtype=np.int32)
+        confusion_matrix = Network.calculate_confusion_matrix(true_labels, predicted_labels, self.category_count)
+        self.save_confusion_matrix_image(confusion_matrix, "multiview")
+        precision, recall = Network.compute_precision_and_recall(confusion_matrix)
+
+        results = {'class_scores': category_probabilities,
+                   'true_labels': true_labels,
+                   'precision': precision,
+                   'recall': recall}
+
+        if self.output_directory is not None:
+            np.savez_compressed(os.path.join(self.output_directory, "multiview_test_results.npz"), **results)
+
+    def test(self, test_data, verbose=True):
+        if verbose:
+            print('Testing the network...')
+        if self.parameters is None:
+            # the odd case when the user wants to test a completely un-trained model
+            self.initialize_parameters(test_data)
+
+        validation_batch_size = 5
+
+        test_minibatch_index_sets = Network.get_batch_indices(len(test_data), validation_batch_size)
+
+        class_probabilities, true_labels, precision, recall = \
+            self.compute_prediction_precision_and_recall(test_data, test_minibatch_index_sets, verbose=False)
+
+        predicted_labels = np.argmax(class_probabilities, axis=1)
+        confusion_matrix = \
+            Network.calculate_confusion_matrix(true_labels, predicted_labels, category_count=self.category_count)
+        self.save_confusion_matrix_image(confusion_matrix, "monocular")
 
         results = {'class_scores': class_probabilities,
                    'true_labels': true_labels,
                    'precision': precision,
                    'recall': recall}
+
+        test_batch_indices = Network.get_batch_indices(len(test_data), validation_batch_size)
+        error = self.compute_prediction_error(test_data, test_batch_indices)
+        print("Test error: ", error)
+
         if self.output_directory is not None:
             np.savez_compressed(os.path.join(self.output_directory, "sequence_test_results.npz"), **results)
 
@@ -491,7 +555,8 @@ class Model(object):
                        'true_labels': true_labels,
                        'start_frame': [d['start'] for d in test_data.meta_information],
                        'end_frame': [d['end'] for d in test_data.meta_information],
-                       'label': [d['label'] for d in test_data.meta_information]}
+                       'label': [d['label'] for d in test_data.meta_information],
+                       'source': [d['source'] for d in test_data.meta_information]}
         if self.output_directory is not None:
             np.savez_compressed(os.path.join(self.output_directory, "timestep_test_results.npz"), **results_all)
 

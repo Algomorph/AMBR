@@ -121,6 +121,7 @@ class Parameters(object):
         self.parameter_dict.update(self.lstm.__dict__)
 
     def write_to_dict(self, archive_dict):
+        self.__update_dict()
         for key, value in self.parameter_dict.items():
             archive_dict[key] = value.get_value()
 

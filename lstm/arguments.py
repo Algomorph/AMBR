@@ -19,10 +19,15 @@ from ext_argparse.argument import Argument
 
 class Arguments(Enum):
     # ================= WORK FOLDER, INPUT & OUTPUT FILES =============================================================#
-    folder = Argument(default="/media/algomorph/Data/AMBR_data/ml", arg_type=str,
+    folder = Argument(default="/media/algomorph/Data/AMBR_data/ml/", arg_type=str,
                       arg_help="Path to root folder to work in.",
                       setting_file_location=True)
-    hidden_unit_count = Argument(default=64, arg_type=int, action='store',
+    data_subfolder = Argument(default="cap04", arg_type=str,
+                              arg_help="Relative path from the root folder to location of feature and label files.")
+    model_file = Argument(default="lstm_model.npz",
+                          arg_help="Relative path from the root folder to the file where the trained lstm" +
+                                   " model will be saved to and/or loaded from.")
+    hidden_unit_count = Argument(default=128, arg_type=int, action='store',
                                  arg_help="Embedding layer size and LSTM number of hidden units.")
     patience = Argument(default=15, arg_type=int,
                         arg_help="Number of epochs to wait before early stop if there is no training progress.")
@@ -63,6 +68,12 @@ class Arguments(Enum):
                                arg_help="Whether or not to overwrite the model at the model file location.")
     random_seed = Argument(default=2016, arg_type=int,
                            arg_help="Random seed to use for shuffling sample sequences and initializing weights.")
-    datasets = Argument(default=["al0"], nargs='+', arg_help="data sets to process")
+    datasets = Argument(default=["al0"], nargs='+', arg_help="Datasets to process.")
+    multiview_labels = Argument(default=None, arg_type=str,
+                                arg_help="In case the datasets are coming from multiple views on the same " +
+                                         "subject, this argument should specify the name of the multiview label file" +
+                                         " residing in the work folder.")
     validation_ratio = Argument(default=0.2, arg_type=float, arg_help="Ratio of the data to use for validation.")
     test_ratio = Argument(default=0.2, arg_type=float, arg_help="Ratio of the data to use for testing.")
+    test_entire_data = Argument(default=False, arg_type='bool_flag', action='store_true',
+                                arg_help="Whether or not to test on whole dataset.")
