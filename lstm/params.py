@@ -53,9 +53,9 @@ class Parameters(object):
                 self.classifier_bias = theano.shared(np.zeros((category_count,)).astype(config.floatX),
                                                      self.classifier_bias_literal)  # formerly 'b'
             else:
-                self.read_values_from_dict(archive)
+                self.load_values_from_dict(archive)
 
-        def read_values_from_dict(self, archive):
+        def load_values_from_dict(self, archive):
             self.embedding_weights = theano.shared(archive[self.embedding_weights_literal],
                                                    self.embedding_weights_literal)
             self.classifier_weights = theano.shared(archive[self.classifier_weights_literal],
@@ -131,7 +131,7 @@ class Parameters(object):
         return archive_dict
 
     def read_from_dict(self, archive_dict):
-        self.globals.read_values_from_dict(archive_dict)
+        self.globals.load_values_from_dict(archive_dict)
         self.lstm.read_values_from_dict(archive_dict)
         self.__update_dict()
 

@@ -292,7 +292,7 @@ class Network(object):
                 # Get new shuffled index for the training set.
                 train_minibatch_indices = Network.get_batch_indices(len(training_data), batch_size, shuffle=True)
 
-                # traverse all the mini-batches
+                # traverse all the mini-batches (1 update per minibatch)
                 for training_minibatch_indices in train_minibatch_indices:
 
                     # Select the random sequences for this minibatch
@@ -490,7 +490,6 @@ class Network(object):
                     non_empty_count += 1
                     x, mask, y = prepare_data(sequence_set.features, sequence_set.label)
                     set_category_probabilities = self.compute_sequence_class_probabilities(x, mask)
-                    # print("Set", np.argmax(set_category_probabilities, axis=1), sequence_set.label)
                     set_category_probabilities *= sequence_set.contributions[np.newaxis].T
                     cumulative_contributions += set_category_probabilities.sum(axis=0)
 
@@ -500,7 +499,7 @@ class Network(object):
                 true_labels.append(true_label)
                 predicted_label = np.argmax(cumulative_contributions)
                 predicted_labels.append(predicted_label)
-                # print("Group:", true_label, predicted_label, group_category_probabilities)
+
         true_labels = np.array(true_labels, dtype=np.int32)
         predicted_labels = np.array(predicted_labels, dtype=np.int32)
         confusion_matrix = Network.calculate_confusion_matrix(true_labels, predicted_labels, self.category_count)

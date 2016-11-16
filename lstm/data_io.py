@@ -134,7 +134,7 @@ def load_test_data(datasets, base_work_folder):
     return SequenceDataset(features_by_sample, labels_by_sample, meta_by_sample), n_categories, n_features
 
 
-def load_data(datasets, base_work_folder, validation_ratio=0.2, test_ratio=0.2):
+def load_data(datasets, base_work_folder, validation_ratio=0.2, test_ratio=0.2, randomization_seed=None):
     """Loads the dataset
     :type datasets: list[str]
     :param datasets: names of the datasets
@@ -154,6 +154,8 @@ def load_data(datasets, base_work_folder, validation_ratio=0.2, test_ratio=0.2):
 
     # split features into test, training, and validation set
     n_samples = len(features_by_sample)
+    if randomization_seed is not None:
+        np.random.seed(randomization_seed)
     randomized_index = np.random.permutation(n_samples)
     train_ratio = 1.0 - test_ratio - validation_ratio
     test_count = int(np.round(n_samples * test_ratio))
@@ -207,7 +209,6 @@ class SequenceSet(object):
 
     def empty(self):
         return len(self.features) == 0
-
 
 
 def break_up_groups(groups, randomize=False):
@@ -277,14 +278,17 @@ def load_multiview_test_data(datasets, base_work_folder, multiview_label_filenam
     n_categories = len(unique_labels)
     n_features = len(test_set_x[0][0])
     test_set = SequenceDataset(test_set_x, test_set_y, test_set_meta)
-    return test_set, groups,  n_categories, n_features
+    return test_set, groups, n_categories, n_features
 
 
-def load_multiview_data(datasets, base_work_folder, multiview_label_filename, validation_ratio=0.2, test_ratio=0.2):
+def load_multiview_data(datasets, base_work_folder, multiview_label_filename, validation_ratio=0.2, test_ratio=0.2,
+                        randomization_seed=None):
     groups, sample_count = load_multiview_data_helper(datasets, base_work_folder, multiview_label_filename)
 
     n_groups = len(groups)
     print("Total number of groups: {:d}, total number of samples: {:d}".format(n_groups, sample_count))
+    if randomization_seed is not None:
+        np.random.seed(randomization_seed)
     randomized_index = np.random.permutation(n_groups)
     train_ratio = 1.0 - test_ratio - validation_ratio
     test_count = int(round(n_groups * test_ratio))

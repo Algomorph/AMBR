@@ -10,6 +10,8 @@ import sys
 # charts
 import matplotlib as mpl
 
+import numpy as np
+
 from matplotlib import pyplot as plt
 from lstm.data_io import load_data, load_multiview_data, load_test_data, load_multiview_test_data
 from ext_argparse.argproc import process_arguments
@@ -42,16 +44,17 @@ def main():
     else:
         if args.multiview_labels is None:
             training_data, validation_data, test_data, n_categories, n_features = \
-                load_data(args.datasets, args.folder, args.validation_ratio, args.test_ratio)
+                load_data(args.datasets, args.folder, args.validation_ratio, args.test_ratio,
+                          randomization_seed=args.random_seed)
         else:
             training_data, validation_data, test_data, test_groups, n_categories, n_features = \
                 load_multiview_data(args.datasets, args.folder, args.multiview_labels,
-                                    args.validation_ratio, args.test_ratio)
+                                    args.validation_ratio, args.test_ratio, randomization_seed=args.random_seed)
 
     # This create the initial parameters as numpy arrays.
     # This will create Theano Shared Variables from the model parameters.
-    if args.reload_model:
-        parameters = Parameters(archive=model_path)
+    if os.path.exists(model_path) and not args.overwrite_model:
+        parameters = Parameters(archive=np.load(model_path))
     else:
         parameters = Parameters(n_features, args.hidden_unit_count, n_categories)
 
@@ -69,7 +72,6 @@ def main():
             print("Validation: %d" % len(validation_data))
             print("Test: %d" % len(test_data))
             print("--------------------")
-
 
         if args.overwrite_model or not os.path.isfile(model_path):
             network.train(training_data, validation_data, test_data, args.batch_size, args.validation_batch_size,

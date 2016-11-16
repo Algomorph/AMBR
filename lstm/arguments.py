@@ -59,15 +59,14 @@ class Arguments(Enum):
                                     "Ilya Sutskever, and Ruslan Salakhutdinov.\n    Dropout: a simple way to " +
                                     "prevent neural networks from overfitting. Journal of Machine Learning " +
                                     "Research 15, no. 1\n(2014): 1929-1958.")
-    reload_model = Argument(default=False, arg_type='bool_flag', action='store_true',
-                            arg_help="Whether or not to reload the existing model from the model file location.")
     weighted = Argument(default=False, arg_type='bool_flag', action='store_true',
                         arg_help="Whether or not to weigh update cost using the inverse combined sequence" +
                                  "count ratio of each category to the total sample count.")
     overwrite_model = Argument(default=False, arg_type='bool_flag', action='store_true',
                                arg_help="Whether or not to overwrite the model at the model file location.")
-    random_seed = Argument(default=2016, arg_type=int,
-                           arg_help="Random seed to use for shuffling sample sequences and initializing weights.")
+    random_seed = Argument(default=19350108, arg_type=int,
+                           arg_help="Random seed to use for shuffling sample sequences and initializing weights." +
+                           "By default set to Elvis Presley's birthday in sortable date format.")
     datasets = Argument(default=["al0"], nargs='+', arg_help="Datasets to process.")
     multiview_labels = Argument(default=None, arg_type=str,
                                 arg_help="In case the datasets are coming from multiple views on the same " +
