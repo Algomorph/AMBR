@@ -7,7 +7,7 @@ Kramida, Gregory, Yiannis Aloimonos, Chethan Mysore Parameshwara, Cornelia Ferm√
 
 There are two major code contributions you can utilize here:
 
-* Class structure / system for custom video processing. The IMBGS background subtractor[1] which is used within these scripts is [cve, a separate opencv-based C++ utility](https://github.com/Algomorph/cve) that is ported to python. You can find it here, compile using CMake, and run make_install. Credit goes to [Domenico Daniele Bloisi](http://www.dis.uniroma1.it/~bloisi/software/imbs.html) for the original IMBS implementation that I adapted for this project. It also uses the vgg_utils.py script for extracting VGG features [2] from the forground bounding boxes of each video frame. It was adapted from [this repository](https://github.com/jesu9/VGGFeatExtract) by @jesu9.
+* Class structure / system for custom video processing. The IMBGS background subtractor[1] which is used within these scripts is [cve, a separate opencv-based C++ utility](https://github.com/Algomorph/cve) that is ported to python. You can find it here, compile using CMake, and run make_install. Credit goes to [Domenico Daniele Bloisi](http://www.dis.uniroma1.it/~bloisi/software/imbs.html) for the original IMBS implementation that I adapted for this project. It also uses the vgg_utils.py script for extracting VGG features [2] from the foreground bounding boxes of each video frame. It was adapted from [this repository](https://github.com/jesu9/VGGFeatExtract) by @jesu9.
 
 * Complete LSTM network setup, with an embedding/classifier layer. This includes many useful tools for improving performance in various situations, such as "Dropout" and ADADELTA (see workshop article for details and references.) The input features that it expects is a numpy archive with a matrix called "features", where each row is a feature vector representing a single time step. The label file that it expects (for basic, single-view mode) is a simple json file. See format from example given below. For a dataset, both files should have the same name but different extension (i.e. .npz and .py). Multiple datasets may be used at once to train the network. The LSTM network code easily generalizes to any scenario with discretized time/event sequences without any modifications.
 
@@ -35,7 +35,7 @@ Note that the program is currently tested well only for single-view scenarios, i
    }
 ]
 ```
-Each entry within the array represents a sequence, the [start, end] bounds are just 0-based idexes (bounds are both inclusive!). These point to the rows in the feature matrix that should be provided in the numpy archive.
+Each entry within the array represents a sequence, the [start, end] bounds are just 0-based indexes (bounds are both inclusive!). These point to the rows in the feature matrix that should be provided in the numpy archive.
 
 To ease manual annotation, the label_converter.py script is also provided, which can convert labels from a manual text-entry format to the above JSON format. Here is an example of a manual text-entry label file:
 ```
@@ -74,7 +74,7 @@ Useful runnable utilities are:
 * extract_vgg_features_from_video.py (compiles feature numpy archives)
 * extract_silhouettes.py (compiles BG-subtracted video of single moving subject & corresponding mask video -- useful for debugging background subtraction)
 * label_converter.py (for converting labels from simpler text files to properly-formatted json, see section above)
-* lstm/run.py (should be run from root project folder! The actual LSTM training/testing procedure.)
+* lstm/run.py (The actual LSTM training/testing procedure.)
   
 [1] Bloisi, Domenico, and Luca Iocchi. "Independent multimodal background subtraction." In CompIMAGE, pp. 39-44. 2012.
 [2] Simonyan, Karen, and Andrew Zisserman. "Very deep convolutional networks for large-scale image recognition." arXiv preprint arXiv:1409.1556 (2014).
