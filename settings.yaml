@@ -1,0 +1,5 @@
+datapath: /media/<current_user>/Data/AMBR_data/cap/mouse_cap06/videoset
+raw_options:
+    al0_raw.mp4:
+        global_offset: 38
+        flip: true
