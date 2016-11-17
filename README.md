@@ -5,13 +5,23 @@ This repository includes all the python utilities for the project described in m
 
 Kramida, Gregory, Yiannis Aloimonos, Chethan Mysore Parameshwara, Cornelia Fermüller, Nikolas Alejandro Francis, and Patrick Kanold. "Automated Mouse Behavior Recognition using VGG Features and LSTM Networks." [Link to PDF](http://homepages.inf.ed.ac.uk/rbf/VAIB16PAPERS/vaibkramida.pdf).
 
+### Potentially Useful Code
+
 There are two major code contributions you can utilize here:
 
 * Class structure / system for custom video processing. The IMBGS background subtractor[1] which is used within these scripts is [cve, a separate opencv-based C++ utility](https://github.com/Algomorph/cve) that is ported to python. You can find it here, compile using CMake, and run make_install. Credit goes to [Domenico Daniele Bloisi](http://www.dis.uniroma1.it/~bloisi/software/imbs.html) for the original IMBS implementation that I adapted for this project. It also uses the vgg_utils.py script for extracting VGG features [2] from the forground bounding boxes of each video frame. It was adapted from [this repository](https://github.com/jesu9/VGGFeatExtract) by @jesu9.
 
-* Complete LSTM network setup, with an embedding/classifier layer. This includes many useful tools for improving performance in various situations, such as "Dropout" and ADADELTA (see workshop article for details and references.) The input features that it expects is a numpy archive with a matrix called "features", where each row is a feature vector representing a single time step. The label file that it expects (for basic, single-view mode) is a simple json file. See format from example given below. For a dataset, both files should have the same name but different extension (i.e. .npz and .py). Multiple datasets may be used at once to train the network. The LSTM network code easily generalizes to any scenario with discretized time/event sequences without any modifications.
+* Complete LSTM network setup, with an embedding/classifier layer. This includes many useful tools for improving performance in various situations, such as "Dropout" and ADADELTA (see workshop article for details and references.) The input features that it expects is a numpy archive with a matrix called "features", where each row is a feature vector representing a single time step. The label file that it expects (for basic, single-view mode) is a simple json file. See format from example given below after the Dependencies section. For a dataset, both files should have the same name but different extension (i.e. .npz and .py). Multiple datasets may be used at once to train the network. The LSTM network code easily generalizes to any scenario with discretized time/event sequences without any modifications.
 
 Note that the program is currently tested well only for single-view scenarios, i.e. where data is not multimodal or coming from multiple views on the same subject. The multiview mode in the LSTM code is purely experimental at this point, as I currently lack sufficient data to test it. Heck, I bet that it's buggy, use multiview stuff at your own peril.
+
+### Dependencies
+
+This cose was only tested on Ubuntu, albeit it is writ in Python **3** (and CMake-based C++ for the cve library if you need that part), so theoretically it should be usable on other major operating systems. Most definitely you can use it on any debianoid system.
+
+The prerequesites are as follows:
+OpenCV, Caffe, and cve for various parts of (1) above. Caffe & OpenCV should be compiled correctly using Python 3. This may require you to ensure you have the latest protobuf (3) and it's corresponding Python 3 bindings (can be installed via pip), both of which should be easily installable or included in your system as long as you keep up with the times.
+For LSTM (part 2 above), you only need an up-to-date numpy, matplotlib, and theano, all of which are easily installable via pip.
 
 ### JSON label file format
 ```json
