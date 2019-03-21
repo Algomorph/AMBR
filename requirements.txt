@@ -1,6 +1,5 @@
 cv2
 yaml
-pylab
 matplotlib
 theano
 pyyaml
